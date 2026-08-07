@@ -1,0 +1,196 @@
+[
+    {
+        "url": "https://raw.githubusercontent.com/Hackershimul07/Cloudstream/builds/BanglaPlex.cs3",
+        "status": 1,
+        "version": 1,
+        "name": "BanglaPlex",
+        "internalName": "BanglaPlex",
+        "authors": [
+            "Shimul_Ahmed"
+        ],
+        "description": "BanglaPlex",
+        "fileSize": 21071,
+        "repositoryUrl": "https://github.com/Hackershimul07/Cloudstream",
+        "language": "bn",
+        "tvTypes": [
+            "Movie",
+            "TvSeries"
+        ],
+        "iconUrl": "https://www.google.com/s2/favicons?domain=banglaplex.click&sz=%size%",
+        "apiVersion": 1,
+        "fileHash": "sha256-117557c7008961b33ded371713ea851a0060e06fdfb353cbd964b2c5cae875b1",
+        "jarFileSize": 89810,
+        "jarUrl": "https://raw.githubusercontent.com/Hackershimul07/Cloudstream/builds/BanglaPlex.jar",
+        "jarHash": "sha256-b3290127d182b3f7ebc10a7f567f0a5011b9fd25ca3e842e4f40a76fbd8c5861"
+    },
+    {
+        "url": "https://raw.githubusercontent.com/Hackershimul07/Cloudstream/builds/CineFreak.cs3",
+        "status": 1,
+        "version": 1,
+        "name": "CineFreak",
+        "internalName": "CineFreak",
+        "authors": [
+            "Shimul_Ahmed"
+        ],
+        "description": "Bangla/Hindi Movies/Series",
+        "fileSize": 67311,
+        "repositoryUrl": "https://github.com/Hackershimul07/Cloudstream",
+        "language": "bn",
+        "tvTypes": [
+            "Movie",
+            "TvSeries",
+            "Anime"
+        ],
+        "iconUrl": "https://raw.githubusercontent.com/Hackershimul07/Cloudstream/refs/heads/master/CineFreak/cinefreak.png",
+        "apiVersion": 1,
+        "fileHash": "sha256-294f7d94a1982b63919d4273a6747f1a0570dbcb46fe605a1a3cdc1ac5d2729a",
+        "jarFileSize": 295711,
+        "jarUrl": "https://raw.githubusercontent.com/Hackershimul07/Cloudstream/builds/CineFreak.jar",
+        "jarHash": "sha256-5af7d6819ddfb89dea808502206cf6cf860036df49b61a808e7b0e34eae9c589"
+    },
+    {
+        "url": "https://raw.githubusercontent.com/Hackershimul07/Cloudstream/builds/CTGMovies.cs3",
+        "status": 1,
+        "version": 2,
+        "name": "CTGMovies",
+        "internalName": "CTGMovies",
+        "authors": [
+            "Shimul_Ahmed"
+        ],
+        "description": "CTGMovies Provider - Stream Movies, TV Shows, and Anime from ctgmovies.com",
+        "fileSize": 37169,
+        "repositoryUrl": "https://github.com/Hackershimul07/Cloudstream",
+        "language": "bn",
+        "tvTypes": [
+            "Movie",
+            "TvSeries",
+            "Anime"
+        ],
+        "iconUrl": "https://raw.githubusercontent.com/Hackershimul07/Photo/refs/heads/main/images.jpeg",
+        "apiVersion": 1,
+        "fileHash": "sha256-7f05c5fa3ce191f093d48c7eed23bec67571c8dc8cffc3b24dd30b7174bc5fc9"
+    },
+    {
+        "url": "https://raw.githubusercontent.com/Hackershimul07/Cloudstream/builds/DesireMovies.cs3",
+        "status": 1,
+        "version": 7,
+        "name": "DesireMovies",
+        "internalName": "DesireMovies",
+        "authors": [
+            "Shimul_Ahmed"
+        ],
+        "description": "DesireMovies",
+        "fileSize": 20810,
+        "repositoryUrl": "https://github.com/Hackershimul07/Cloudstream",
+        "language": "bn",
+        "tvTypes": [
+            "Movie",
+            "TvSeries"
+        ],
+        "iconUrl": "https://www.google.com/s2/favicons?domain=1desiremovies.wales&sz=%size%",
+        "apiVersion": 1,
+        "fileHash": "sha256-9d6aa17f91eefdd25c7abb3bb4f467ff78110bd1b6877c2364e197263193393a"
+    },
+    {
+        "url": "https://raw.githubusercontent.com/Hackershimul07/Cloudstream/builds/FMFTP.cs3",
+        "status": 1,
+        "version": 7,
+        "name": "FMFTP",
+        "internalName": "FMFTP",
+        "authors": [
+            "Shimul_Ahmed"
+        ],
+        "description": "FMFTP - Free Movies FTP Provider",
+        "fileSize": 61719,
+        "repositoryUrl": "https://github.com/Hackershimul07/Cloudstream",
+        "language": "bn",
+        "tvTypes": [
+            "Movie",
+            "TvSeries"
+        ],
+        "iconUrl": "https://fmftp.net/mini-logo.png",
+        "apiVersion": 1,
+        "fileHash": "sha256-fc55abd53f192e8c8dc74aa00c3e022d2be95435fe413388d06ae74487c7815f"
+    },
+    {
+        "url": "https://raw.githubusercontent.com/Hackershimul07/Cloudstream/builds/HDhub4u.cs3",
+        "status": 1,
+        "version": 1,
+        "name": "HDhub4u",
+        "internalName": "HDhub4u",
+        "authors": [
+            "Shimul_Ahmed"
+        ],
+        "fileSize": 78378,
+        "repositoryUrl": "https://github.com/Hackershimul07/Cloudstream",
+        "language": "bn",
+        "tvTypes": [
+            "Movie",
+            "TvSeries",
+            "Anime"
+        ],
+        "iconUrl": "https://raw.githubusercontent.com/phisher98/TVVVV/refs/heads/main/Icons/HDHUB.png",
+        "apiVersion": 1,
+        "fileHash": "sha256-1f77f705df666682a045965c6e96f71f8a9516cc5f5e8de3ec6e65ab0a46dbfe"
+    },
+    {
+        "url": "https://raw.githubusercontent.com/Hackershimul07/Cloudstream/builds/MovieBoxProvider.cs3",
+        "status": 1,
+        "version": 6,
+        "name": "MovieBoxProvider",
+        "internalName": "MovieBoxProvider",
+        "authors": [
+            "Shimul_Ahmed"
+        ],
+        "description": "Multi Language Movies and Series Provider",
+        "fileSize": 70034,
+        "repositoryUrl": "https://github.com/Hackershimul07/Cloudstream",
+        "language": "bn",
+        "tvTypes": [
+            "Movie",
+            "TvSeries"
+        ],
+        "iconUrl": "https://raw.githubusercontent.com/Hackershimul07/Cloudstream/refs/heads/master/MovieBoxProvider/icon.png",
+        "apiVersion": 1,
+        "fileHash": "sha256-3310f3b872ee5f6549ecc3762bab85609f524f2e08394913b883bb8e25896eb7"
+    },
+    {
+        "url": "https://raw.githubusercontent.com/Hackershimul07/Cloudstream/builds/PornHub.cs3",
+        "status": 1,
+        "version": 1,
+        "name": "PornHub",
+        "internalName": "PornHub",
+        "authors": [
+            "Shimul_Ahmed"
+        ],
+        "description": "Welcome to Pornhub.com, home of the best hardcore free porn videos with the hottest adult stars. Get full length scenes from your favorite porn studios 24/7!",
+        "fileSize": 17205,
+        "repositoryUrl": "https://github.com/Hackershimul07/Cloudstream",
+        "language": "bn",
+        "tvTypes": [
+            "NSFW"
+        ],
+        "iconUrl": "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://www.pornhub.com/&size=128",
+        "apiVersion": 1,
+        "fileHash": "sha256-e582e9b4cced8071e6d0c1271e9207aaaf22002465125ff0f81adcf2acf98d68"
+    },
+    {
+        "url": "https://raw.githubusercontent.com/Hackershimul07/Cloudstream/builds/XNXX.cs3",
+        "status": 1,
+        "version": 1,
+        "name": "XNXX",
+        "internalName": "XNXX",
+        "authors": [
+            "SIX"
+        ],
+        "fileSize": 26771,
+        "repositoryUrl": "https://github.com/Hackershimul07/Cloudstream",
+        "language": "en",
+        "tvTypes": [
+            "NSFW"
+        ],
+        "iconUrl": "https://www.google.com/s2/favicons?domain=https://www.xnxx.com&sz=256",
+        "apiVersion": 1,
+        "fileHash": "sha256-a346d218303ee9862f153efe6bf53d970373bacba9298a19b239eb45af36aa94"
+    }
+]

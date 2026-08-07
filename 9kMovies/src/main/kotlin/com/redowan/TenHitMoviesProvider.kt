@@ -99,6 +99,3 @@ override suspend fun loadLinks(
 
     return true
 }
-
-}
-}

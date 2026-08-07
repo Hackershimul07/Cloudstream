@@ -11,7 +11,7 @@ import com.lagradost.cloudstream3.utils.loadExtractor
 import org.jsoup.nodes.Element
 
 class TenHitMoviesProvider : MainAPI() {
-    override var mainUrl = "https://10hitmovies.study/"
+    override var mainUrl = "https://10hitmovies.study"
     override var name = "10HitMovies"
     override var lang = "bn"
     override val hasMainPage = true
@@ -37,9 +37,16 @@ class TenHitMoviesProvider : MainAPI() {
     request: MainPageRequest
 ): HomePageResponse {
     val url = if (request.data.isEmpty()) {
-    "${mainUrl}page/$page"
-} else {
-    "${mainUrl}${request.data.removePrefix("/")}/page/$page"
+        "${mainUrl}page/$page"
+    } else {
+        "${mainUrl}${request.data.removePrefix("/")}/page/$page"
+    }
+
+    val doc = app.get(url).document
+    val home = doc.select(".thumb.col-md-2.col-sm-4.col-xs-6")
+        .mapNotNull { toResult(it) }
+
+    return newHomePageResponse(request.name, home, hasNext = true)
 }
 
 private fun toResult(post: Element): SearchResponse {

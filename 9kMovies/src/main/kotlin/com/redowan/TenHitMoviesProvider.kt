@@ -9,9 +9,11 @@ import com.lagradost.cloudstream3.newMovieLoadResponse
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.loadExtractor
 
-class TenHitMoviesProvider : NineKMoviesProvider() {
-    override var mainUrl = "https://10hitmovies.com/"
+class TenHitMoviesProvider : MainAPI() {
+    override var mainUrl = "https://10hitmovies.study/"
     override var name = "10HitMovies"
+    override var lang = "bn"
+    override val hasMainPage = true
     override val supportedTypes = setOf(
         TvType.Movie,
         TvType.NSFW

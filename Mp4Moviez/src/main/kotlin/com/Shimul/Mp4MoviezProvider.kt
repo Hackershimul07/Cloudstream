@@ -29,6 +29,7 @@ class Mp4MoviezProvider : MainAPI() {
     override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries, TvType.NSFW)
     override val mainPage = mainPageOf(
         "" to "Latest Updates",
+        "/4/south-indian-hindi-dubbed-movies.html" to "Hindi Dubbed",
         "/276/bangladeshi-movies.html" to "Bangladeshi Movies",
         "/189/netflix-series-hindi-dubbed.html" to "New Hindi Dubbed Series"
     )

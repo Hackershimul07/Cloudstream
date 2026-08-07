@@ -34,6 +34,7 @@ jobs:
       - name: Create builds branch if missing
         if: steps.checkout_builds.outcome == 'failure'
         run: |
+          rm -rf $GITHUB_WORKSPACE/builds
           mkdir -p $GITHUB_WORKSPACE/builds
           cd $GITHUB_WORKSPACE/builds
           git init

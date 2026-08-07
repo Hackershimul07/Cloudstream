@@ -20,7 +20,7 @@ class TenHitMoviesProvider : NineKMoviesProvider() {
         "" to "Latest Movies",
         "/category/18-movies/" to "18+ Movies",
         "/category/dual-audio/" to "Dual Audio",
-        "/category/hindi-dubbed/" to "Hindi Dubbed"
+        "/category/hindi-dubbed/" to "Hindi Dubbed",
             "/category/bengali-movies/" to "Bangla Movies"
         )
 

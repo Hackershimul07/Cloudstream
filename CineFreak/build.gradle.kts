@@ -20,7 +20,7 @@ cloudstream {
         "Anime"
     )
     language = "bn"
-    iconUrl = "https://raw.githubusercontent.com/phisher98/TVVVV/refs/heads/main/Icons/cinefreak.png"
+    iconUrl = "https://raw.githubusercontent.com/Hackershimul07/Cloudstream/refs/heads/main/CineFreak/cinefreak.png"
 
     isCrossPlatform = true
 }

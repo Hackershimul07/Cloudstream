@@ -1,4 +1,4 @@
-package com.redowan
+package com.shimul
 
 import com.lagradost.cloudstream3.LoadResponse
 import com.lagradost.cloudstream3.SubtitleFile

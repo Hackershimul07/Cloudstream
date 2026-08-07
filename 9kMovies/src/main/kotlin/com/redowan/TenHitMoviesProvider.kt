@@ -37,16 +37,9 @@ class TenHitMoviesProvider : MainAPI() {
     request: MainPageRequest
 ): HomePageResponse {
     val url = if (request.data.isEmpty()) {
-        "${mainUrl}page/$page"
-    } else {
-        "${mainUrl}${request.data.removePrefix("/")}/page/$page"
-    }
-
-    val doc = app.get(url).document
-    val home = doc.select(".thumb.col-md-2.col-sm-4.col-xs-6")
-        .mapNotNull { toResult(it) }
-
-    return newHomePageResponse(request.name, home, hasNext = true)
+    "${mainUrl}page/$page"
+} else {
+    "${mainUrl}${request.data.removePrefix("/")}/page/$page"
 }
 
 private fun toResult(post: Element): SearchResponse {

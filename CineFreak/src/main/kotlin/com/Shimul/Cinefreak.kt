@@ -1,4 +1,4 @@
-package com.cinefreak
+package com.Shimul
 
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.api.Log

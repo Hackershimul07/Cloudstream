@@ -1,13 +1,13 @@
 // use an integer for version numbers
-version = 7
+version = 1
 
 android {
-    namespace = "com.redowan"
+    namespace = "com.shimul"
 }
 
 cloudstream {
     description = "Included:10HitMovies"
-    authors = listOf("salman731","Dilip")
+    authors = listOf("Shimul_Ahmed")
 
     /**
     * Status int as the following:
@@ -28,5 +28,5 @@ cloudstream {
     )
     language = "hi"
 
-    iconUrl = "https://9kmovies.claims/m/wp-content/uploads/2019/08/9kmovies.ico"
+    iconUrl = "https://10hitmovies.study/wp-content/uploads/2024/08/cropped-10hiti-270x270.png"
 }

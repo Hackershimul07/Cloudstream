@@ -7,6 +7,13 @@ android {
     }
 }
 
+dependencies {
+    val cloudstream by configurations
+    implementation("androidx.appcompat:appcompat:1.7.1")
+    implementation("com.google.android.material:material:1.14.0")
+    cloudstream("com.lagradost:cloudstream3:pre-release")
+}
+
 cloudstream {
     language = "bn"
     // All of these properties are optional, you can safely remove them
@@ -26,6 +33,9 @@ cloudstream {
         "Movie",
         "TvSeries"
     )
+    requiresResources = true
 
     iconUrl = "https://raw.githubusercontent.com/Hackershimul07/Cloudstream/refs/heads/main/MovieBoxProvider/icon.png"
+
+    isCrossPlatform = false
 }

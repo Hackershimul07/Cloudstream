@@ -28,6 +28,24 @@ jobs:
         with:
           ref: "builds"
           path: "builds"
+        continue-on-error: true
+        id: checkout_builds
+
+      - name: Create builds branch if missing
+        if: steps.checkout_builds.outcome == 'failure'
+        run: |
+          mkdir -p $GITHUB_WORKSPACE/builds
+          cd $GITHUB_WORKSPACE/builds
+          git init
+          git remote add origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+          git checkout --orphan builds
+          echo "# Builds" > README.md
+          echo "[]" > plugins.json
+          git add README.md plugins.json
+          git config --local user.email "actions@github.com"
+          git config --local user.name "GitHub Actions"
+          git commit -m "Initial builds branch"
+          git push origin builds
       
       - name: Clean old builds
         run: rm $GITHUB_WORKSPACE/builds/*.cs3 || true

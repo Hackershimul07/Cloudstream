@@ -1,6 +1,7 @@
 package com.shimul
 
 import com.lagradost.cloudstream3.LoadResponse
+import com.lagradost.cloudstream3.MainAPI
 import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.TvType
 import com.lagradost.cloudstream3.app
@@ -19,12 +20,12 @@ class TenHitMoviesProvider : MainAPI() {
         TvType.NSFW
     )
     override val mainPage = mainPageOf(
-        "" to "Latest Movies",
-        "/category/18-movies/" to "18+ Movies",
-        "/category/dual-audio/" to "Dual Audio",
-        "/category/hindi-dubbed/" to "Hindi Dubbed",
-            "/category/bengali-movies/" to "Bangla Movies"
-        )
+    "" to "Latest Movies",
+    "/category/18-movies/" to "18+ Movies",
+    "/category/dual-audio/" to "Dual Audio",
+    "/category/hindi-dubbed/" to "Hindi Dubbed",
+    "/category/bengali-movies/" to "Bangla Movies"
+)
 
  
     override suspend fun load(url: String): LoadResponse {

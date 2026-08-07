@@ -8,7 +8,7 @@ class CineFreakProvider : MainAPI() {
     override var mainUrl = "https://cinefreak.nl"
     override var name = "CineFreak"
     override val hasMainPage = true
-    override var lang = "en"
+    override var lang = "bn"
     override val hasDownloadSupport = true
     override val supportedTypes = setOf(
         TvType.Movie,

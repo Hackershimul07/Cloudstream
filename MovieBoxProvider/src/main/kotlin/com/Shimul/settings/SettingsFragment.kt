@@ -10,7 +10,7 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import androidx.appcompat.app.AlertDialog
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
-import com.hackershimul07.BuildConfig
+import com.Shimul.BuildConfig
 
 class SettingsFragment(
     private val plugin: MovieBoxProviderPlugin,
@@ -28,18 +28,18 @@ class SettingsFragment(
     )
 
     private fun getDrawable(name: String): Drawable {
-        val id = res.getIdentifier(name, "drawable", "com.hackershimul07")
+        val id = res.getIdentifier(name, "drawable", "com.Shimul")
         return res.getDrawable(id, null) ?: throw Exception("Drawable $name not found")
     }
 
     private fun <T : View> View.findView(name: String): T {
-        val id = res.getIdentifier(name, "id", "com.hackershimul07")
+        val id = res.getIdentifier(name, "id", "com.Shimul")
         if (id == 0) throw Exception("View ID $name not found.")
         return this.findViewById(id)
     }
 
     private fun View.makeTvCompatible() {
-        val outlineId = res.getIdentifier("outline", "drawable", "com.hackershimul07")
+        val outlineId = res.getIdentifier("outline", "drawable", "com.Shimul")
         this.background = res.getDrawable(outlineId, null)
     }
 
@@ -62,11 +62,11 @@ class SettingsFragment(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?,
     ): View {
-            val layoutId = res.getIdentifier("fragment_moviebox_settings", "layout", "com.hackershimul07")
+            val layoutId = res.getIdentifier("fragment_moviebox_settings", "layout", "com.Shimul")
             val layout = res.getLayout(layoutId)
             val view = inflater.inflate(layout, container, false)
             
-            val drawableId = res.getIdentifier("dialog_background", "drawable", "com.hackershimul07")
+            val drawableId = res.getIdentifier("dialog_background", "drawable", "com.Shimul")
         if (drawableId != 0) {
             view.background = res.getDrawable(drawableId, null)
         }

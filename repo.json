@@ -1,0 +1,8 @@
+{
+    "name": "Shimul's BDIX repository",
+    "description": "Shimul's BDIX repository",
+    "manifestVersion": 1,
+    "pluginLists": [
+      "https://raw.githubusercontent.com/hackershimul07/Shimul-CloudStream/builds/plugins.json"
+    ]
+}

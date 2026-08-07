@@ -10,7 +10,7 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import androidx.appcompat.app.AlertDialog
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
-import com.phisher98.BuildConfig
+import com.hackershimul07.BuildConfig
 
 class SettingsFragment(
     private val plugin: MovieBoxProviderPlugin,
@@ -28,18 +28,18 @@ class SettingsFragment(
     )
 
     private fun getDrawable(name: String): Drawable {
-        val id = res.getIdentifier(name, "drawable", "com.phisher98")
+        val id = res.getIdentifier(name, "drawable", "com.hackershimul07")
         return res.getDrawable(id, null) ?: throw Exception("Drawable $name not found")
     }
 
     private fun <T : View> View.findView(name: String): T {
-        val id = res.getIdentifier(name, "id", "com.phisher98")
+        val id = res.getIdentifier(name, "id", "com.hackershimul07")
         if (id == 0) throw Exception("View ID $name not found.")
         return this.findViewById(id)
     }
 
     private fun View.makeTvCompatible() {
-        val outlineId = res.getIdentifier("outline", "drawable", "com.phisher98")
+        val outlineId = res.getIdentifier("outline", "drawable", "com.hackershimul07")
         this.background = res.getDrawable(outlineId, null)
     }
 
@@ -62,11 +62,11 @@ class SettingsFragment(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?,
     ): View {
-            val layoutId = res.getIdentifier("fragment_moviebox_settings", "layout", "com.phisher98")
+            val layoutId = res.getIdentifier("fragment_moviebox_settings", "layout", "com.hackershimul07")
             val layout = res.getLayout(layoutId)
             val view = inflater.inflate(layout, container, false)
             
-            val drawableId = res.getIdentifier("dialog_background", "drawable", "com.phisher98")
+            val drawableId = res.getIdentifier("dialog_background", "drawable", "com.hackershimul07")
         if (drawableId != 0) {
             view.background = res.getDrawable(drawableId, null)
         }

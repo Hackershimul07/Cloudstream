@@ -31,8 +31,7 @@ class TenHitMoviesProvider : MainAPI() {
         "/category/hollywood-movies/" to "Hollywood"
     )
 
- 
-    override suspend fun getMainPage(
+override suspend fun getMainPage(
     page: Int,
     request: MainPageRequest
 ): HomePageResponse {
@@ -48,7 +47,6 @@ class TenHitMoviesProvider : MainAPI() {
 
     return newHomePageResponse(request.name, home, hasNext = true)
 }
-
 private fun toResult(post: Element): SearchResponse {
     val url = post.select("figure figcaption a").attr("href")
     val title = post.select("figure figcaption a").text()
@@ -57,7 +55,7 @@ private fun toResult(post: Element): SearchResponse {
     return newMovieSearchResponse(title, url, TvType.Movie) {
         posterUrl = imageUrl
         posterHeaders = mapOf(
-            "Referer" to "https://10hitmovies.study/"
+            "Referer" to "https://10hitmovies.study"
         )
     }
 }

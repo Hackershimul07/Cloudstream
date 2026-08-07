@@ -1,4 +1,4 @@
-package com.cinefreak
+package com.Shimul
 
 import com.lagradost.cloudstream3.extractors.StreamTape
 import com.lagradost.cloudstream3.plugins.BasePlugin

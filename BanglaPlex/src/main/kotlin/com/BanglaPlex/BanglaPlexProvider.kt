@@ -21,7 +21,7 @@ class BanglaPlexProvider: BasePlugin() {
 
     companion object {
         private const val DOMAINS_URL =
-            "https://raw.githubusercontent.com/phisher98/TVVVV/refs/heads/main/domains.json"
+            "https://raw.githubusercontent.com/Hackershimul07/banglflexdomain/refs/heads/main/domains.json"
         var cachedDomains: Domains? = null
 
         suspend fun getDomains(forceRefresh: Boolean = false): Domains? {

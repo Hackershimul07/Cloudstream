@@ -88,7 +88,7 @@ override suspend fun loadLinks(
 
     val buttonElements = doc.select("a[href^=https://mysavelinks]")
 
-    buttonElements.forEach { item ->
+        buttonElements.forEach { item ->
         val shortLinkUrl = item.attr("href")
         val sDoc = app.post(shortLinkUrl).document
 
@@ -98,4 +98,5 @@ override suspend fun loadLinks(
     }
 
     return true
+}
 }

@@ -36,7 +36,8 @@ class TenHitMoviesProvider : MainAPI() {
     page: Int,
     request: MainPageRequest
 ): HomePageResponse {
-    val doc = app.get("$mainUrl${request.data}page/$page").document
+    val path = if (request.data.isEmpty()) "/" else request.data
+val doc = app.get("$mainUrl${path}page/$page").document
     val home = doc.select(".thumb.col-md-2.col-sm-4.col-xs-6").mapNotNull { toResult(it) }
     return newHomePageResponse(request.name, home, hasNext = true)
 }

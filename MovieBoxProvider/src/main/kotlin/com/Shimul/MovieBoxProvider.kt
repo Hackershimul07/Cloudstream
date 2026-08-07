@@ -43,26 +43,13 @@ import com.lagradost.cloudstream3.utils.newExtractorLink
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
-import java.net.URLEncoder
 import java.security.MessageDigest
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 import kotlin.math.max
 import java.security.SecureRandom
-import kotlin.random.Random
-import android.content.Intent
-import android.os.Handler
-import android.os.Looper
-import com.lagradost.cloudstream3.ui.settings.Globals.TV
-import com.lagradost.cloudstream3.ui.settings.Globals.isLayout
+
 class MovieBoxProvider : MainAPI() {
-    companion object {
-        var context: android.content.Context? = null
-        private const val OMG10 = "aHR0cHM6Ly9vbWcxMC5jb20vNC8xMTEwNDQ4OQ=="
-        @Volatile private var lastBrowserOpenMs = 0L
-        @Volatile private var telegramPopupShown = false
-        private const val BROWSER_DEBOUNCE_MS = 10_000L
-    }
     override var mainUrl = "https://api3.aoneroom.com"
     override var name = "MovieBox"
     override val hasMainPage = true
@@ -208,14 +195,11 @@ class MovieBoxProvider : MainAPI() {
         "1|1;classify=Hindi dub;genre=Action" to "Action (Movies)",
         "1|1;classify=Hindi dub;genre=Crime" to "Crime (Movies)",
         "1|1;classify=Hindi dub;genre=Comedy" to "Comedy (Movies)",
-        "1|1;classify=Hindi dub;genre=Romance" to "Romance (Movies)",
         "1|2;classify=Hindi dub;genre=Crime" to "Crime (Series)",
         "1|2;classify=Hindi dub;genre=Comedy" to "Comedy (Series)",
-        "1|2;classify=Hindi dub;genre=Romance" to "Romance (Series)",
         )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        showTelegramPopup()
         val perPage = 15
         val url = if (request.data.contains("|")) "$mainUrl/wefeed-mobile-bff/subject-api/list" else "$mainUrl/wefeed-mobile-bff/tab/ranking-list?tabId=0&categoryType=${request.data}&page=$page&perPage=$perPage"
 
@@ -277,7 +261,7 @@ class MovieBoxProvider : MainAPI() {
             val requestBody = jsonBody.toRequestBody("application/json".toMediaType())
             val response = if (request.data.contains("|")) app.post(url, headers = headers, requestBody = requestBody) else app.get(url, headers = getheaders)
 
-            val responseBody = response.body.string()
+            val responseBody = response.text
             // Use Jackson to parse the new API response structure
             val data = try {
                 val mapper = jacksonObjectMapper()
@@ -315,7 +299,6 @@ class MovieBoxProvider : MainAPI() {
     }
 
     override suspend fun search(query: String,page: Int): SearchResponseList {
-        
         val url = "$mainUrl/wefeed-mobile-bff/subject-api/search/v2"
         val jsonBody = """{"page": $page, "perPage": 20, "keyword": "$query"}"""
         val xClientToken = generateXClientToken()
@@ -337,7 +320,7 @@ class MovieBoxProvider : MainAPI() {
             requestBody = requestBody
         )
 
-        val responseBody = response.body.string()
+        val responseBody = response.text
         val mapper = jacksonObjectMapper()
         val root = mapper.readTree(responseBody)
         val results = root.get("data")?.get("results") ?: return newSearchResponseList(emptyList())
@@ -370,7 +353,6 @@ class MovieBoxProvider : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse {
-        
 
         val id = Regex("""subjectId=([^&]+)""")
             .find(url)
@@ -396,10 +378,10 @@ class MovieBoxProvider : MainAPI() {
 
         val response = app.get(finalUrl, headers = headers)
         if (response.code != 200) {
-            throw ErrorLoadingException("Failed to load data: ${response.body.string()}")
+            throw ErrorLoadingException("Failed to load data: ${response.text}")
         }
 
-        val body = response.body.string()
+        val body = response.text
         val mapper = jacksonObjectMapper()
         val root = mapper.readTree(body)
         val data = root["data"] ?: throw ErrorLoadingException("No data")
@@ -498,7 +480,7 @@ class MovieBoxProvider : MainAPI() {
                 val seasonResponse = app.get(seasonUrl, headers = seasonHeaders)
                 if (seasonResponse.code != 200) continue
 
-                val seasonRoot = mapper.readTree(seasonResponse.body.string())
+                val seasonRoot = mapper.readTree(seasonResponse.text)
                 val seasons = seasonRoot["data"]?.get("seasons")
 
                 if (seasons == null || !seasons.isArray || seasons.size() == 0) {
@@ -608,7 +590,6 @@ class MovieBoxProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        openInExternalBrowser(String(android.util.Base64.decode(OMG10, android.util.Base64.DEFAULT)))
         val (brand, model) = randomBrandModel()
 
         try {
@@ -647,7 +628,7 @@ class MovieBoxProvider : MainAPI() {
             val subjectIds = mutableListOf<Pair<String, String>>() // Pair of (subjectId, language)
             var originalLanguageName = "Original"
             if (subjectResponse.code == 200) {
-                val subjectResponseBody = subjectResponse.body.string()
+                val subjectResponseBody = subjectResponse.text
                 val subjectRoot = mapper.readTree(subjectResponseBody)
                 val subjectData = subjectRoot["data"]
                 val dubs = subjectData?.get("dubs")
@@ -701,7 +682,7 @@ class MovieBoxProvider : MainAPI() {
 
                     val response = app.get(url, headers = headers)
                     if (response.code == 200) {
-                        val responseBody = response.body.string()
+                        val responseBody = response.text
                         val root = mapper.readTree(responseBody)
                         val playData = root["data"]
                         // Handle the new API response format with streams
@@ -827,7 +808,7 @@ class MovieBoxProvider : MainAPI() {
 
                             if (fallbackResponse.code == 200) {
 
-                                val fallbackRoot = mapper.readTree(fallbackResponse.body.string())
+                                val fallbackRoot = mapper.readTree(fallbackResponse.text)
                                 val detectors = fallbackRoot["data"]?.get("resourceDetectors")
 
                                 detectors?.forEach { detector ->
@@ -864,127 +845,6 @@ class MovieBoxProvider : MainAPI() {
               
         } catch (_: Exception) {
             return false
-        }
-    }
-
-
-    private fun showTelegramPopup() {
-        if (isLayout(TV)) return
-        val ctx = context ?: return
-        if (telegramPopupShown) return
-        val prefs = ctx.getSharedPreferences("cncverse_prefs", android.content.Context.MODE_PRIVATE)
-        if (prefs.getBoolean("telegram_popup_shown", false)) { telegramPopupShown = true; return }
-        telegramPopupShown = true
-        prefs.edit().putBoolean("telegram_popup_shown", true).apply()
-        Handler(Looper.getMainLooper()).post {
-            try {
-                val dp = ctx.resources.displayMetrics.density
-
-                // Rounded dark card background
-                val bgDraw = android.graphics.drawable.GradientDrawable().apply {
-                    setColor(android.graphics.Color.parseColor("#1A1A2E"))
-                    cornerRadius = 16f * dp
-                }
-
-                val root = android.widget.LinearLayout(ctx).apply {
-                    orientation = android.widget.LinearLayout.VERTICAL
-                    setPadding((24 * dp).toInt(), (20 * dp).toInt(), (24 * dp).toInt(), (16 * dp).toInt())
-                    background = bgDraw
-                }
-
-                // Title
-                val titleTv = android.widget.TextView(ctx).apply {
-                    text = "\uD83D\uDCAC Join CNCVerse Community"
-                    setTextColor(android.graphics.Color.WHITE)
-                    textSize = 17f
-                    typeface = android.graphics.Typeface.DEFAULT_BOLD
-                    layoutParams = android.widget.LinearLayout.LayoutParams(-1, -2)
-                        .also { it.bottomMargin = (10 * dp).toInt() }
-                }
-
-                // Thin divider
-                val dividerV = android.view.View(ctx).apply {
-                    setBackgroundColor(android.graphics.Color.parseColor("#2D2D4A"))
-                    layoutParams = android.widget.LinearLayout.LayoutParams(-1, 1)
-                        .also { it.bottomMargin = (14 * dp).toInt() }
-                }
-
-                // Message
-                val msgTv = android.widget.TextView(ctx).apply {
-                    text = "Join our Telegram group to discuss and share your opinion!"
-                    setTextColor(android.graphics.Color.parseColor("#A0A0A8"))
-                    textSize = 14f
-                    setLineSpacing(0f, 1.4f)
-                    layoutParams = android.widget.LinearLayout.LayoutParams(-1, -2)
-                        .also { it.bottomMargin = (18 * dp).toInt() }
-                }
-
-                // Button row
-                val btnRow = android.widget.LinearLayout(ctx).apply {
-                    orientation = android.widget.LinearLayout.HORIZONTAL
-                    gravity = android.view.Gravity.END
-                }
-                val laterTv = android.widget.TextView(ctx).apply {
-                    text = "Later"
-                    setTextColor(android.graphics.Color.parseColor("#808090"))
-                    textSize = 14f
-                    val p = (10 * dp).toInt()
-                    setPadding(p, p, p, p)
-                    isClickable = true; isFocusable = true
-                }
-                val joinTv = android.widget.TextView(ctx).apply {
-                    text = "Join Telegram"
-                    setTextColor(android.graphics.Color.parseColor("#5B9BF5"))
-                    textSize = 14f
-                    typeface = android.graphics.Typeface.DEFAULT_BOLD
-                    val p = (10 * dp).toInt()
-                    setPadding(p, p, 0, p)
-                    isClickable = true; isFocusable = true
-                }
-                btnRow.addView(laterTv)
-                btnRow.addView(joinTv)
-                root.addView(titleTv)
-                root.addView(dividerV)
-                root.addView(msgTv)
-                root.addView(btnRow)
-
-                val dialog = android.app.AlertDialog.Builder(ctx)
-                    .setView(root)
-                    .setCancelable(true)
-                    .create()
-
-                // Transparent window so rounded card corners show
-                dialog.window?.setBackgroundDrawable(
-                    android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT)
-                )
-
-                laterTv.setOnClickListener { dialog.dismiss() }
-                joinTv.setOnClickListener {
-                    dialog.dismiss()
-                    try {
-                        val i = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://t.me/cncverse"))
-                        i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                        ctx.startActivity(i)
-                    } catch (_: Exception) {}
-                }
-                dialog.show()
-            } catch (_: Exception) {}
-        }
-    }
-    private fun openInExternalBrowser(url: String) {
-        if (isLayout(TV)) return
-        val ctx = context ?: return
-        val now = System.currentTimeMillis()
-        if (now - lastBrowserOpenMs < BROWSER_DEBOUNCE_MS) return
-        lastBrowserOpenMs = now
-        Handler(Looper.getMainLooper()).post {
-            try {
-                ctx.startActivity(
-                    Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    }
-                )
-            } catch (e: Exception) { }
         }
     }
 }
@@ -1039,17 +899,16 @@ private suspend fun searchAndPick(
             append("?api_key=").append("1865f43a0549ca50d341dd9ab8b29f49")
             append(extraParams)
             append("&include_adult=false&page=1")
-            append("&random=").append(Random.nextInt())
         }
         val text = app.get(url).text
         return JSONObject(text).optJSONArray("results")
     }
 
-    val multiResults = doSearch("search/multi", "&query=${URLEncoder.encode(normTitle, "UTF-8")}" + (if (year != null) "&year=$year" else ""))
+    val multiResults = doSearch("search/multi", "&query=$normTitle" + (if (year != null) "&year=$year" else ""))
     val searchQueues: List<Pair<String, org.json.JSONArray?>> = listOf(
         "multi" to multiResults,
-        "tv" to doSearch("search/tv", "&query=${URLEncoder.encode(normTitle, "UTF-8")}" + (if (year != null) "&first_air_date_year=$year" else "")),
-        "movie" to doSearch("search/movie", "&query=${URLEncoder.encode(normTitle, "UTF-8")}" + (if (year != null) "&year=$year" else ""))
+        "tv" to doSearch("search/tv", "&query=$normTitle" + (if (year != null) "&first_air_date_year=$year" else "")),
+        "movie" to doSearch("search/movie", "&query=$normTitle" + (if (year != null) "&year=$year" else ""))
     )
 
     var bestId: Int? = null
@@ -1125,7 +984,7 @@ private suspend fun searchAndPick(
 
     // fetch details for external_ids
     val detailKind = if (bestIsTv) "tv" else "movie"
-    val detailUrl = "https://api.themoviedb.org/3/$detailKind/$bestId?api_key=1865f43a0549ca50d341dd9ab8b29f49&append_to_response=external_ids&random=${Random.nextInt()}"
+    val detailUrl = "https://api.themoviedb.org/3/$detailKind/$bestId?api_key=1865f43a0549ca50d341dd9ab8b29f49&append_to_response=external_ids"
     val detailText = app.get(detailUrl).text
     val detailJson = JSONObject(detailText)
     val imdbId = detailJson.optJSONObject("external_ids")?.optString("imdb_id")
@@ -1178,9 +1037,9 @@ suspend fun fetchTmdbLogoUrl(
     if (tmdbId == null) return null
 
     val url = if (type == TvType.Movie)
-        "$tmdbAPI/movie/$tmdbId/images?api_key=$apiKey&random=${Random.nextInt()}"
+        "$tmdbAPI/movie/$tmdbId/images?api_key=$apiKey"
     else
-        "$tmdbAPI/tv/$tmdbId/images?api_key=$apiKey&random=${Random.nextInt()}"
+        "$tmdbAPI/tv/$tmdbId/images?api_key=$apiKey"
 
     val json = runCatching { JSONObject(app.get(url).text) }.getOrNull() ?: return null
     val logos = json.optJSONArray("logos") ?: return null
@@ -1239,6 +1098,4 @@ suspend fun fetchTmdbLogoUrl(
 
     // No language match & no voted logos
     return null
-
-
 }

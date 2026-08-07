@@ -49,12 +49,12 @@ subprojects {
     apply(plugin = "com.lagradost.cloudstream3.gradle")
 
     cloudstream {
-        setRepo(System.getenv("GITHUB_REPOSITORY") ?: "https://github.com/hackershimul07/Shimul-CloudStream")
+        setRepo(System.getenv("GITHUB_REPOSITORY") ?: "https://github.com/hackershimul07/CloudStream")
         authors = listOf("Shimul")
     }
 
     android {
-        namespace = "com.Redowan"
+        namespace = "com.Shimul"
         compileSdk = 36
 
         defaultConfig {

@@ -22,23 +22,15 @@ import org.jsoup.nodes.Element
 class Mp4MoviezProvider : MainAPI() {
     override var mainUrl = "https://www.mp4moviez.capital"
     override var name = "Mp4Moviez"
-    override var lang = "hi"
+    override var lang = "bn"
     override val hasMainPage = true
     override val hasDownloadSupport = true
     override val hasQuickSearch = false
     override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries, TvType.NSFW)
     override val mainPage = mainPageOf(
         "" to "Latest Updates",
-        "/88/hot-web-series.html" to "Latest Hindi Hot Web Series",
-        "/22/bollywwood-old-movies.html" to "Old Bollywood Movies",
-        "/49/hollywood-all-movies.html" to "Hollywood Movies",
-        "/42/punjabi-movies-collection.html" to "Punjabi Movies",
-        "/74/latest-kannada-movies.html" to "Kannada Movies",
-        "/189/netflix-series-hindi-dubbed.html" to "New Hindi Dubbed Series",
-        "/167/tagalog-movies.html" to "Tagalog Hot Movies Hot",
-        "/267/filipino-movies.html" to "Filipino Hot Movies Hot",
-        "/296/latest-hindi-short-films-(2024).html" to "New Hindi Short Films Hot",
-        "/245/ullu-web-series.html" to "ULLU Web series",
+        "/276/bangladeshi-movies.html" to "Bangladeshi Movies",
+        "/189/netflix-series-hindi-dubbed.html" to "New Hindi Dubbed Series"
     )
 
     override suspend fun getMainPage(

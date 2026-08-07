@@ -125,7 +125,7 @@ class MovieBoxProvider(private val sharedPref: SharedPreferences? = null) : Main
 
     override var name = "MovieBox"
     override val hasMainPage = true
-    override var lang = "hi"
+    override var lang = "bn"
     override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
 
     private val secretKeyDefault = base64Decode("NzZpUmwwN3MweFNOOWpxbUVXQXQ3OUVCSlp1bElRSXNWNjRGWnIyTw==")

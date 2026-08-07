@@ -1,6 +1,6 @@
 <div align="center">
 
-# 📦 Shimul's Cloudstream Plugin Repo
+# 📦 Shimul's Cloudstream Plugin
 
 **A curated Cloudstream extension repository focused on BDIX-supported & Bangladeshi websites**
 

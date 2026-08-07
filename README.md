@@ -1,4 +1,38 @@
-# `Shimul's Cloudstream Plugin Repo`
+<div align="center">
 
-From now, Only BDIX supported websites that can be accessd from my isp or Bangladeshi websites will be added. $\color{Red}{\textbf{Please, Don't request for other websites.}}$
-## <a href="https://raw.githubusercontent.com/hackershimul07/CloudStream/main/repo.json">Install</a>
+# 📦 Shimul's Cloudstream Plugin Repo
+
+**A curated Cloudstream extension repository focused on BDIX-supported & Bangladeshi websites**
+
+[![Install Repo](https://img.shields.io/badge/📲%20Install-Repo-blueviolet?style=for-the-badge)](https://raw.githubusercontent.com/hackershimul07/CloudStream/main/repo.json)
+
+</div>
+
+---
+
+## ℹ️ About
+
+From now on, **only BDIX-supported websites** (accessible via Bangladeshi ISPs) or **Bangladeshi websites** will be added to this repo.
+
+> ⚠️ **Please do not request other (non-BDIX / non-Bangladeshi) websites.**
+
+---
+
+## 🚀 Installation
+
+1. Open **Cloudstream**
+2. Go to **Settings → Extensions → Repositories**
+3. Tap **➕ Add Repository**
+4. Paste the link below:
+
+```
+https://raw.githubusercontent.com/hackershimul07/CloudStream/main/repo.json
+```
+
+Or simply tap the button here 👉 **[Install Repo](https://raw.githubusercontent.com/hackershimul07/CloudStream/main/repo.json)**
+
+---
+
+<div align="center">
+Made with ❤️ for the Bangladeshi Cloudstream community
+</div>

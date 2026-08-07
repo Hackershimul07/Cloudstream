@@ -31,7 +31,7 @@ class Mp4MoviezProvider : MainAPI() {
         "" to "Latest Updates",
         "/4/south-indian-hindi-dubbed-movies.html" to "Hindi Dubbed",
         "/276/bangladeshi-movies.html" to "Bangladeshi Movies",
-        "/189/netflix-series-hindi-dubbed.html" to "New Hindi Dubbed Series"
+        "/189/netflix-series-hindi-dubbed.html" to "New Hindi Dubbed Series",
     )
 
     override suspend fun getMainPage(

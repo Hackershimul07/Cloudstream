@@ -1,7 +1,8 @@
 {
   "name": "Shimul_Ahmed",
   "description": "A fast and reliable CloudStream repository maintained by Shimul.",
-  "manifestVersion": 2,
+  "manifestVersion": 3,
+  "iconUrl": "https://raw.githubusercontent.com/Hackershimul07/Photo/refs/heads/main/SAVE_20260731_222208.jpg",
   "pluginLists": [
     "https://raw.githubusercontent.com/hackershimul07/CloudStream/builds/plugins.json"
   ]

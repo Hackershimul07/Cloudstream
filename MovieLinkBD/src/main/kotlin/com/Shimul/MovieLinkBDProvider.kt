@@ -6,11 +6,11 @@ import android.content.Context
 
 class MovieLinkBDProvider : MainAPI() {
     companion object {
-        var appContext: Context? = null
-        private const val FALLBACK_URL = "https://movielinkbd.one"
-    }
+    var appContext: Context? = null
+    private const val FALLBACK_URL = "https://t3jhua.movielinkbd.li"
+}
 
-    override var mainUrl = "https://movielinkbd.one"
+    override var mainUrl = "https://t3jhua.movielinkbd.li"
     override var name = "MovieLinkBD"
     override var lang = "bn"
     override val hasMainPage = true

@@ -6,7 +6,7 @@ import org.jsoup.nodes.Element
 
 open class DesicinemasProvider : MainAPI() {
     override val supportedTypes = setOf(TvType.Movie)
-    override var lang = "hi"
+    override var lang = "bn"
     override var mainUrl = "https://desicinemas.to"
     override var name = "Desicinemas"
     override val hasMainPage = true

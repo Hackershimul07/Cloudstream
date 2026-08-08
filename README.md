@@ -2,7 +2,7 @@
 
 # 📦 Shimul's Cloudstream Plugin
 
-**A curated Cloudstream extension repository focused on BDIX-supported & Bangladeshi websites**
+**A curated Cloudstream extension repository focused on Bangladeshi websites**
 
 [![Install Repo](https://img.shields.io/badge/📲%20Install-Repo-blueviolet?style=for-the-badge)](https://raw.githubusercontent.com/hackershimul07/CloudStream/main/repo.json)
 
@@ -12,7 +12,7 @@
 
 ## ℹ️ About
 
-From now on, **only BDIX-supported websites** (accessible via Bangladeshi ISPs) or **Bangladeshi websites** will be added to this repo.
+From now on, **Bangladeshi websites** will be added to this repo.
 
 > ⚠️ **Please do not request other (non-BDIX / non-Bangladeshi) websites.**
 

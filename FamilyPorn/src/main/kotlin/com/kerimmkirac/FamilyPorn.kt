@@ -1,5 +1,3 @@
-// ! Bu araç @kerimmkirac tarafından | @Cs-GizliKeyif için yazılmıştır.
-
 package com.kerimmkirac
 
 import android.util.Log
@@ -15,7 +13,7 @@ class FamilyPorn : MainAPI() {
     override var mainUrl              = "https://familypornhd.com"
     override var name                 = "FamilyPorn"
     override val hasMainPage          = true
-    override var lang                 = "en"
+    override var lang                 = "bn"
     override val hasQuickSearch       = false
     override val supportedTypes       = setOf(TvType.NSFW)
 

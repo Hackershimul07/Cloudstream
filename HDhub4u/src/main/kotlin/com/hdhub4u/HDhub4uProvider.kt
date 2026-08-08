@@ -41,7 +41,7 @@ class HDhub4uProvider : MainAPI() {
         HDhub4uPlugin.getDomains()?.HDHUB4u ?: "https://hdhub4u.glass"
     }
     override var name = "HDHub4U"
-    override var lang = "hi"
+    override var lang = "bn"
     override val hasMainPage = true
     override val hasDownloadSupport = true
     override val hasQuickSearch = false

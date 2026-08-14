@@ -3,6 +3,7 @@ package com.cncverse
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import android.content.Context
+import org.json.JSONObject
 
 class MovieLinkBDProvider : MainAPI() {
     companion object {
@@ -70,8 +71,6 @@ class MovieLinkBDProvider : MainAPI() {
         }
     }
 
-    // ── REMOVED: openInExternalBrowser() - No more ads! ───────────────────
-
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val base = getBase()
         val path = request.data
@@ -98,7 +97,7 @@ class MovieLinkBDProvider : MainAPI() {
 
         if (cards.isNotEmpty()) {
             cards.forEach { card ->
-                val aTag = card.selectFirst("a[href*='/movie/'], a[href*='/series/'], a[href*='/anime/'], a[href*='/download18plus/']")
+                val aTag = card.selectFirst("a[href*='/movie/'], a[href*='/series/'], a[href*='/anime/'], a[href*='/drama/'], a[href*='/download18plus/']")
                     ?: return@forEach
                 val href = aTag.attr("abs:href").ifEmpty { base + aTag.attr("href") }
                 val title = card.selectFirst(".title, .movie-title, h3, h2")?.text()?.trim()
@@ -108,7 +107,7 @@ class MovieLinkBDProvider : MainAPI() {
                 val poster = img?.attr("data-src")?.ifEmpty { img.attr("src") }
                     ?: img?.attr("src")
 
-                val type = if (href.contains("/series/") || href.contains("/anime/"))
+                val type = if (href.contains("/series/") || href.contains("/anime/") || href.contains("/drama/"))
                     TvType.TvSeries else TvType.Movie
 
                 results.add(newMovieSearchResponse(title, href, type) {
@@ -118,7 +117,7 @@ class MovieLinkBDProvider : MainAPI() {
             return results
         }
 
-        val movieLinkPattern = "a[href*='/movie/'], a[href*='/series/'], a[href*='/anime/'], a[href*='/download18plus/']"
+        val movieLinkPattern = "a[href*='/movie/'], a[href*='/series/'], a[href*='/anime/'], a[href*='/drama/'], a[href*='/download18plus/']"
         val seen = mutableSetOf<String>()
         doc.select(movieLinkPattern).forEach { a ->
             val href = a.attr("abs:href").ifEmpty { base + a.attr("href") }
@@ -131,7 +130,7 @@ class MovieLinkBDProvider : MainAPI() {
                 ?: a.text().trim().takeIf { it.isNotEmpty() }
                 ?: return@forEach
 
-            val type = if (href.contains("/series/") || href.contains("/anime/"))
+            val type = if (href.contains("/series/") || href.contains("/anime/") || href.contains("/drama/"))
                 TvType.TvSeries else TvType.Movie
 
             results.add(newMovieSearchResponse(title, href, type) {
@@ -145,13 +144,69 @@ class MovieLinkBDProvider : MainAPI() {
                 if (!seen.add(href)) return@forEach
                 val title = a.text().trim().takeIf { it.isNotEmpty() } ?: return@forEach
                 if (title.length < 4 || title.all { it.isUpperCase() || it == ' ' }) return@forEach
-                val type = if (href.contains("/series/") || href.contains("/anime/"))
+                val type = if (href.contains("/series/") || href.contains("/anime/") || href.contains("/drama/"))
                     TvType.TvSeries else TvType.Movie
                 results.add(newMovieSearchResponse(title, href, type))
             }
         }
 
         return results
+    }
+
+    // ── New: parse the inline player JSON (mlbdInlinePlayerData) ──────────
+    private data class PlayerSource(val quality: Int, val url: String, val audio: String)
+    private data class PlayerEpisode(
+        val kind: String,
+        val season: Int?,
+        val number: Int?,
+        val label: String,
+        val sources: List<PlayerSource>
+    )
+
+    private fun parsePlayerJson(doc: org.jsoup.nodes.Document): List<PlayerEpisode> {
+        return try {
+            val scriptData = doc.selectFirst("script#mlbdInlinePlayerData")?.data() ?: return emptyList()
+            val json = JSONObject(scriptData)
+            val episodesArr = json.optJSONArray("episodes") ?: return emptyList()
+
+            val result = mutableListOf<PlayerEpisode>()
+            for (i in 0 until episodesArr.length()) {
+                val ep = episodesArr.getJSONObject(i)
+                val kind = ep.optString("kind", "movie")
+                val season = if (ep.isNull("season")) null else ep.optInt("season")
+                val number = if (ep.isNull("number")) null else ep.optInt("number")
+                val label = ep.optString("label", "Episode")
+
+                val sourcesArr = ep.optJSONArray("sources")
+                val sources = mutableListOf<PlayerSource>()
+                if (sourcesArr != null) {
+                    for (j in 0 until sourcesArr.length()) {
+                        val src = sourcesArr.getJSONObject(j)
+                        val quality = src.optInt("quality", 0)
+                        val downloadUrl = src.optString("download_url", "")
+                        val streamUrl = src.optString("url", "")
+                        val finalUrl = downloadUrl.ifEmpty { streamUrl }
+                        val audio = src.optString("audio", "")
+                        if (finalUrl.isNotEmpty()) {
+                            sources.add(PlayerSource(quality, finalUrl, audio))
+                        }
+                    }
+                }
+                if (sources.isNotEmpty()) {
+                    result.add(PlayerEpisode(kind, season, number, label, sources))
+                }
+            }
+            result
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    private fun sourcesToLinksData(sources: List<PlayerSource>): String {
+        return sources.joinToString(" ; ") { src ->
+            val qualityLabel = if (src.quality > 0) "${src.quality}p" else "Unknown"
+            "$qualityLabel|${src.url}"
+        }
     }
 
     override suspend fun load(url: String): LoadResponse {
@@ -172,7 +227,7 @@ class MovieLinkBDProvider : MainAPI() {
             }?.text()?.substringAfter(":")?.trim()
         }
 
-        val plot = doc.selectFirst(".storyline p, .storyline, [class*='story'] p, [class*='plot']")
+        val plot = doc.selectFirst(".storyline p, .storyline, .story-text, [class*='story'] p, [class*='plot']")
             ?.text()?.trim()
             ?: metaVal("Storyline")
 
@@ -189,12 +244,20 @@ class MovieLinkBDProvider : MainAPI() {
             plot?.let { append("\n$it") }
         }.trim()
 
-        val isSeries = url.contains("/series/") || url.contains("/anime/")
+        val isSeries = url.contains("/series/") || url.contains("/anime/") || url.contains("/drama/")
+
+        // Try the new inline player JSON first
+        val playerEpisodes = parsePlayerJson(doc)
+
         val linkAnchors = doc.select("a[href*='/getLink/']")
         val watchAnchors = doc.select("a[href*='/getWatch/']")
+        val fileAnchors = doc.select("div.mlbd-download-button-wrap a[href*='/file/'], a[href*='/file/']")
 
         if (!isSeries) {
-            val linksData = (linkAnchors + watchAnchors).mapNotNull { a ->
+            val jsonMovieLinks = playerEpisodes.firstOrNull { it.kind == "movie" }
+                ?.let { sourcesToLinksData(it.sources) }
+
+            val fileLinksData = fileAnchors.mapNotNull { a ->
                 val href = a.attr("abs:href").ifEmpty {
                     val h = a.attr("href")
                     if (h.startsWith("http")) h else "$mainUrl$h"
@@ -202,60 +265,89 @@ class MovieLinkBDProvider : MainAPI() {
                 val text = a.text().trim()
                 val quality = extractQualityLabel(text)
                 "$quality|$href"
-            }.joinToString(" ; ")
+            }.joinToString(" ; ").takeIf { it.isNotEmpty() }
+
+            val oldLinksData = (linkAnchors + watchAnchors).mapNotNull { a ->
+                val href = a.attr("abs:href").ifEmpty {
+                    val h = a.attr("href")
+                    if (h.startsWith("http")) h else "$mainUrl$h"
+                }
+                val text = a.text().trim()
+                val quality = extractQualityLabel(text)
+                "$quality|$href"
+            }.joinToString(" ; ").takeIf { it.isNotEmpty() }
+
+            val linksData = jsonMovieLinks ?: fileLinksData ?: oldLinksData ?: ""
 
             return newMovieLoadResponse(rawTitle, url, TvType.Movie, linksData) {
                 this.posterUrl = poster
                 this.year = year
                 this.plot = fullPlot.takeIf { it.isNotEmpty() }
-                // FIX: Use score instead of rating
                 this.score = rating?.let { Score.from10(it) }
             }
         }
 
+        // ───────── Series ─────────
         val episodesData = mutableListOf<Episode>()
-        val episodeSections = doc.select(
-            "div.episode-section, div.season-section, h3:contains(Episode), h4:contains(Episode), " +
-            "div[class*='episode'], div[class*='season'], strong:contains(Ep), b:contains(Ep)"
-        )
 
-        if (episodeSections.isNotEmpty()) {
-            episodeSections.forEach { section ->
-                val sectionText = section.text()
-                val epRange = Regex("(?:Ep|Episode)[^\\d]*(\\d+)(?:[^\\d]+(\\d+))?", RegexOption.IGNORE_CASE)
-                    .find(sectionText)
-                val start = epRange?.groupValues?.get(1)?.toIntOrNull() ?: 1
-                val end = epRange?.groupValues?.get(2)?.toIntOrNull() ?: start
-
-                val sectionLinks = mutableListOf<String>()
-                var sib = section.nextElementSibling()
-                while (sib != null && !sib.tagName().matches(Regex("h[1-6]"))) {
-                    sib.select("a[href*='/getLink/'], a[href*='/getWatch/']").forEach { a ->
-                        val href = a.attr("abs:href").ifEmpty {
-                            val h = a.attr("href")
-                            if (h.startsWith("http")) h else "$mainUrl$h"
-                        }
-                        val quality = extractQualityLabel(a.text())
-                        sectionLinks.add("$quality|$href")
-                    }
-                    sib = sib.nextElementSibling()
+        val jsonEpisodes = playerEpisodes.filter { it.kind != "movie" }
+        if (jsonEpisodes.isNotEmpty()) {
+            jsonEpisodes.forEach { ep ->
+                val linksData = sourcesToLinksData(ep.sources)
+                if (linksData.isNotEmpty()) {
+                    episodesData.add(newEpisode(linksData) {
+                        this.name = ep.label.ifEmpty { "Episode ${ep.number ?: 1}" }
+                        this.season = ep.season ?: 1
+                        this.episode = ep.number ?: (episodesData.size + 1)
+                    })
                 }
+            }
+        }
 
-                if (sectionLinks.isNotEmpty()) {
-                    val epUrl = sectionLinks.joinToString(" ; ")
-                    for (epNum in start..end) {
-                        episodesData.add(newEpisode(epUrl) {
-                            this.name = "Episode $epNum"
-                            this.season = 1
-                            this.episode = epNum
-                        })
+        if (episodesData.isEmpty()) {
+            val episodeSections = doc.select(
+                "div.episode-section, div.season-section, h3:contains(Episode), h4:contains(Episode), " +
+                "div[class*='episode'], div[class*='season'], strong:contains(Ep), b:contains(Ep)"
+            )
+
+            if (episodeSections.isNotEmpty()) {
+                episodeSections.forEach { section ->
+                    val sectionText = section.text()
+                    val epRange = Regex("(?:Ep|Episode)[^\\d]*(\\d+)(?:[^\\d]+(\\d+))?", RegexOption.IGNORE_CASE)
+                        .find(sectionText)
+                    val start = epRange?.groupValues?.get(1)?.toIntOrNull() ?: 1
+                    val end = epRange?.groupValues?.get(2)?.toIntOrNull() ?: start
+
+                    val sectionLinks = mutableListOf<String>()
+                    var sib = section.nextElementSibling()
+                    while (sib != null && !sib.tagName().matches(Regex("h[1-6]"))) {
+                        sib.select("a[href*='/getLink/'], a[href*='/getWatch/'], a[href*='/file/']").forEach { a ->
+                            val href = a.attr("abs:href").ifEmpty {
+                                val h = a.attr("href")
+                                if (h.startsWith("http")) h else "$mainUrl$h"
+                            }
+                            val quality = extractQualityLabel(a.text())
+                            sectionLinks.add("$quality|$href")
+                        }
+                        sib = sib.nextElementSibling()
+                    }
+
+                    if (sectionLinks.isNotEmpty()) {
+                        val epUrl = sectionLinks.joinToString(" ; ")
+                        for (epNum in start..end) {
+                            episodesData.add(newEpisode(epUrl) {
+                                this.name = "Episode $epNum"
+                                this.season = 1
+                                this.episode = epNum
+                            })
+                        }
                     }
                 }
             }
         }
 
-        if (episodesData.isEmpty() && linkAnchors.isNotEmpty()) {
-            val allLinks = (linkAnchors + watchAnchors).mapNotNull { a ->
+        if (episodesData.isEmpty() && (linkAnchors.isNotEmpty() || fileAnchors.isNotEmpty())) {
+            val allLinks = (linkAnchors + watchAnchors + fileAnchors).mapNotNull { a ->
                 val href = a.attr("abs:href").ifEmpty {
                     val h = a.attr("href")
                     if (h.startsWith("http")) h else "$mainUrl$h"
@@ -275,7 +367,6 @@ class MovieLinkBDProvider : MainAPI() {
             this.posterUrl = poster
             this.year = year
             this.plot = fullPlot.takeIf { it.isNotEmpty() }
-            // FIX: Use score instead of rating
             this.score = rating?.let { Score.from10(it) }
         }
     }
@@ -286,7 +377,6 @@ class MovieLinkBDProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        // REMOVED: openInExternalBrowser() - No more ads!
         if (!data.contains("|")) return false
         data.split(" ; ").forEach { item ->
             val parts = item.split("|")
@@ -295,6 +385,21 @@ class MovieLinkBDProvider : MainAPI() {
             if (linkUrl.isEmpty()) return@forEach
 
             when {
+                linkUrl.contains("cdn.dramalinkbd.tv") ||
+                linkUrl.contains(".mkv") || linkUrl.contains(".mp4") -> {
+                    val quality = labelToQuality(qualityLabel)
+                    callback(
+                        ExtractorLink(
+                            source = name,
+                            name = "$name [$qualityLabel]",
+                            url = linkUrl,
+                            referer = mainUrl,
+                            quality = quality,
+                            type = ExtractorLinkType.VIDEO,
+                            headers = headers
+                        )
+                    )
+                }
                 linkUrl.contains("/getLink/") -> {
                     resolveGetLink(linkUrl, qualityLabel, callback)
                 }
@@ -411,6 +516,7 @@ class MovieLinkBDProvider : MainAPI() {
             text.contains("720", ignoreCase = true) -> "720p"
             text.contains("480", ignoreCase = true) -> "480p"
             text.contains("360", ignoreCase = true) -> "360p"
+            text.contains("Best Quality", ignoreCase = true) -> "Best Quality"
             text.contains("Watch Online", ignoreCase = true) -> "Stream"
             text.contains("Download", ignoreCase = true) -> "Download"
             else -> text.take(30).trim().ifEmpty { "Unknown" }
@@ -420,7 +526,7 @@ class MovieLinkBDProvider : MainAPI() {
     private fun labelToQuality(label: String): Int {
         return when {
             label.contains("4K", ignoreCase = true) || label.contains("2160", ignoreCase = true) -> Qualities.P2160.value
-            label.contains("1080", ignoreCase = true) -> Qualities.P1080.value
+            label.contains("1080", ignoreCase = true) || label.contains("Best Quality", ignoreCase = true) -> Qualities.P1080.value
             label.contains("720", ignoreCase = true) -> Qualities.P720.value
             label.contains("480", ignoreCase = true) -> Qualities.P480.value
             label.contains("360", ignoreCase = true) -> Qualities.P360.value

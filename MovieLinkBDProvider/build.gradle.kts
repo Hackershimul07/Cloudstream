@@ -1,4 +1,5 @@
-version = 2
+// use an integer for version numbers
+version = 3
 
 android {
     buildFeatures {
@@ -6,16 +7,20 @@ android {
     }
 }
 
-dependencies {
-    compileOnly("org.jspecify:jspecify:1.0.0")
-}
-
 cloudstream {
     description = "MovieLinkBD - Largest Movie Download Site in Bangladesh"
-    authors = listOf("Shimul_Ahmed")
+    authors = listOf("NivinCNC")
 
+    /**
+    * Status int as the following:
+    * 0: Down
+    * 1: Ok
+    * 2: Slow
+    * 3: Beta only
+    * */
     status = 1
 
+    // List of video source types.
     tvTypes = listOf(
         "Movie",
         "TvSeries",

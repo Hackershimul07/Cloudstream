@@ -1,32 +1,12 @@
 package com.cncverse
 
+import com.lagradost.cloudstream3.*
+import com.lagradost.cloudstream3.utils.*
 import android.content.Context
-import com.lagradost.cloudstream3.Episode
-import com.lagradost.cloudstream3.HomePageList
-import com.lagradost.cloudstream3.HomePageResponse
-import com.lagradost.cloudstream3.LoadResponse
-import com.lagradost.cloudstream3.MainAPI
-import com.lagradost.cloudstream3.MainPageRequest
-import com.lagradost.cloudstream3.SearchResponse
-import com.lagradost.cloudstream3.SubtitleFile
-import com.lagradost.cloudstream3.TvType
-import com.lagradost.cloudstream3.app
-import com.lagradost.cloudstream3.mainPageOf
-import com.lagradost.cloudstream3.newEpisode
-import com.lagradost.cloudstream3.newHomePageResponse
-import com.lagradost.cloudstream3.newMovieLoadResponse
-import com.lagradost.cloudstream3.newMovieSearchResponse
-import com.lagradost.cloudstream3.newTvSeriesLoadResponse
-import com.lagradost.cloudstream3.utils.ExtractorLink
-import com.lagradost.cloudstream3.utils.ExtractorLinkType
-import com.lagradost.cloudstream3.utils.Qualities
 
 class MovieLinkBDProvider : MainAPI() {
     companion object {
-        var appContext: Context? = null // Yeh line missing thi!
-        
-        // The site uses a rotating subdomain mirror; we store the resolved base
-        // and fall back to movielinkbd.one if the mirror fails.
+        var appContext: Context? = null
         private const val FALLBACK_URL = "https://movielinkbd.one"
     }
 
@@ -71,7 +51,6 @@ class MovieLinkBDProvider : MainAPI() {
         "Accept-Language" to "en-US,en;q=0.9"
     )
 
-    // ── Resolve the live mirror URL ─────────────────────────────────────────
     @Volatile private var resolvedBase: String? = null
 
     private suspend fun getBase(): String {
@@ -91,7 +70,8 @@ class MovieLinkBDProvider : MainAPI() {
         }
     }
 
-    // ── Homepage / category pages ───────────────────────────────────────────
+    // ── REMOVED: openInExternalBrowser() - No more ads! ───────────────────
+
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val base = getBase()
         val path = request.data
@@ -106,14 +86,12 @@ class MovieLinkBDProvider : MainAPI() {
         return newHomePageResponse(HomePageList(request.name, items, isHorizontalImages = true), hasNext = items.isNotEmpty())
     }
 
-    // ── Search ──────────────────────────────────────────────────────────────
     override suspend fun search(query: String): List<SearchResponse> {
         val base = getBase()
         val doc = app.get("$base/?search=${query.trim()}", headers = headers, timeout = 30).document
         return parseMovieCards(doc, base)
     }
 
-    // ── Parse movie cards from listing pages ───────────────────────────────
     private fun parseMovieCards(doc: org.jsoup.nodes.Document, base: String): List<SearchResponse> {
         val results = mutableListOf<SearchResponse>()
         val cards = doc.select("div.movie-item, div.item-box, div.film-item, div.post-item, .movie-card")
@@ -147,7 +125,6 @@ class MovieLinkBDProvider : MainAPI() {
             if (!seen.add(href)) return@forEach
             val img = a.selectFirst("img") ?: return@forEach
             val poster = img.attr("data-src").ifEmpty { img.attr("src") }
-
             val titleEl = a.parent()?.selectFirst(".title, .movie-title, h3, h2, [class*='name']")
             val title = titleEl?.text()?.trim()?.takeIf { it.isNotEmpty() }
                 ?: a.attr("title").trim().takeIf { it.isNotEmpty() }
@@ -177,7 +154,6 @@ class MovieLinkBDProvider : MainAPI() {
         return results
     }
 
-    // ── Detail page ─────────────────────────────────────────────────────────
     override suspend fun load(url: String): LoadResponse {
         val doc = app.get(url, headers = headers, timeout = 30).document
 
@@ -203,6 +179,8 @@ class MovieLinkBDProvider : MainAPI() {
         val genre = metaVal("Genre")
         val cast = metaVal("Cast")
         val language = metaVal("Language")
+        val rating = doc.selectFirst("[class*='imdb'], [class*='rating']")?.text()
+            ?.let { Regex("[0-9.]+").find(it)?.value?.toFloatOrNull() }
 
         val fullPlot = buildString {
             language?.let { append("Language: $it\n") }
@@ -212,7 +190,6 @@ class MovieLinkBDProvider : MainAPI() {
         }.trim()
 
         val isSeries = url.contains("/series/") || url.contains("/anime/")
-
         val linkAnchors = doc.select("a[href*='/getLink/']")
         val watchAnchors = doc.select("a[href*='/getWatch/']")
 
@@ -231,11 +208,12 @@ class MovieLinkBDProvider : MainAPI() {
                 this.posterUrl = poster
                 this.year = year
                 this.plot = fullPlot.takeIf { it.isNotEmpty() }
+                // FIX: Use score instead of rating
+                this.score = rating?.let { Score.from10(it) }
             }
         }
 
         val episodesData = mutableListOf<Episode>()
-
         val episodeSections = doc.select(
             "div.episode-section, div.season-section, h3:contains(Episode), h4:contains(Episode), " +
             "div[class*='episode'], div[class*='season'], strong:contains(Ep), b:contains(Ep)"
@@ -297,16 +275,18 @@ class MovieLinkBDProvider : MainAPI() {
             this.posterUrl = poster
             this.year = year
             this.plot = fullPlot.takeIf { it.isNotEmpty() }
+            // FIX: Use score instead of rating
+            this.score = rating?.let { Score.from10(it) }
         }
     }
 
-    // ── Load links (resolve getLink → direct file URL) ───────────────────────
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+        // REMOVED: openInExternalBrowser() - No more ads!
         if (!data.contains("|")) return false
         data.split(" ; ").forEach { item ->
             val parts = item.split("|")
@@ -343,7 +323,6 @@ class MovieLinkBDProvider : MainAPI() {
         return true
     }
 
-    // ── Resolve /getLink/ to direct download URL ─────────────────────────────
     private suspend fun resolveGetLink(
         getLinkUrl: String,
         qualityLabel: String,
@@ -384,7 +363,6 @@ class MovieLinkBDProvider : MainAPI() {
         } catch (_: Exception) { }
     }
 
-    // ── Resolve /getWatch/ to stream URL ────────────────────────────────────
     private suspend fun resolveGetWatch(
         getWatchUrl: String,
         qualityLabel: String,
@@ -425,7 +403,6 @@ class MovieLinkBDProvider : MainAPI() {
         } catch (_: Exception) { }
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────
     private fun extractQualityLabel(text: String): String {
         return when {
             text.contains("4K", ignoreCase = true) || text.contains("2160", ignoreCase = true) -> "4K"

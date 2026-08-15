@@ -17,7 +17,10 @@ import java.net.URLEncoder
 /**
  * Provider for fs.plus.net.bd — an h5ai powered BDIX file server.
  *
- * Movies:  /Movies/<Language>/<Year-folder>/<Title (Year)>/<file>.mp4
+ * Movies:  either
+ *          /Movies/<Language>/<Year-folder>/<Title (Year)>/<file>.mp4   (year-layout categories)
+ *          or
+ *          /Movies/<Language>/<Title (Year)>/<file>.mp4                (flat categories, e.g. Indian-Bangla, South-Indian, Asian-Anime)
  * Shows:   /Shows/<Tv-Shows|Anime-Shows|Indian-Web-Series>/<Title (Year)>/Season X/<file>.mp4
  *          (shows are listed directly, alphabetically — no year-folder layer)
  */
@@ -30,6 +33,7 @@ class FsPlusNetBdProvider : MainAPI() {
     override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
 
     private val videoRegex = Regex(""".*\.(mp4|mkv|avi|webm)$""", RegexOption.IGNORE_CASE)
+    private val yearFolderRegex = Regex("""^\d{4}(-\d{4})?$""")
     private val TMDB_API_KEY = "4ef0d7355d9ffb5151e987764708ce96"
 
     private val movieCategories = mapOf(
@@ -72,6 +76,10 @@ class FsPlusNetBdProvider : MainAPI() {
         }
         return out
     }
+
+    /** True if every folder name in the list looks like a year or year-range (e.g. "2014", "2001-2010"). */
+    private fun isYearLayout(folders: List<Triple<String, String, Boolean>>): Boolean =
+        folders.isNotEmpty() && folders.all { yearFolderRegex.matches(it.first) }
 
     /** Sorts year-range folder names newest first: 2026, 2025, ..., 2001-2010, 1900-2000 */
     private fun sortYearFolders(folders: List<Triple<String, String, Boolean>>): List<Triple<String, String, Boolean>> {
@@ -137,31 +145,75 @@ class FsPlusNetBdProvider : MainAPI() {
         return poster
     }
 
+    /**
+     * Resolves the list of *title* folders for a movie category, regardless of whether
+     * that category uses a year-folder layer or lists titles flat.
+     */
+    private suspend fun resolveMovieTitleFolders(basePath: String): List<Triple<String, String, Boolean>> {
+        val topFolders = listDir(basePath).filter { it.third }
+        return if (isYearLayout(topFolders)) {
+            coroutineScope {
+                topFolders.map { (_, yearUrl, _) ->
+                    async { listDir(yearUrl.removePrefix("$mainUrl/")).filter { it.third } }
+                }.awaitAll()
+            }.flatten()
+        } else {
+            topFolders
+        }
+    }
+
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val (type, basePath) = request.data.split("|", limit = 2)
 
         return if (type == "MOVIE") {
-            val yearFolders = sortYearFolders(listDir(basePath).filter { it.third })
-            val index = page - 1
-            if (index >= yearFolders.size) {
-                return newHomePageResponse(request.name, emptyList(), hasNext = false)
-            }
-            val (yearName, yearUrl, _) = yearFolders[index]
-            val entries = listDir(yearUrl.removePrefix("$mainUrl/")).filter { it.third }
+            val topFolders = listDir(basePath).filter { it.third }
 
-            val items = coroutineScope {
-                entries.map { (name, url, _) ->
-                    async {
-                        val title = cleanTitle(name)
-                        val year = yearOf(name)
-                        val poster = fetchPoster(title, year, false)
-                        newMovieSearchResponse(title, url, TvType.Movie) {
-                            this.posterUrl = poster
+            if (isYearLayout(topFolders)) {
+                val yearFolders = sortYearFolders(topFolders)
+                val index = page - 1
+                if (index >= yearFolders.size) {
+                    return newHomePageResponse(request.name, emptyList(), hasNext = false)
+                }
+                val (yearName, yearUrl, _) = yearFolders[index]
+                val entries = listDir(yearUrl.removePrefix("$mainUrl/")).filter { it.third }
+
+                val items = coroutineScope {
+                    entries.map { (name, url, _) ->
+                        async {
+                            val title = cleanTitle(name)
+                            val year = yearOf(name)
+                            val poster = fetchPoster(title, year, false)
+                            newMovieSearchResponse(title, url, TvType.Movie) {
+                                this.posterUrl = poster
+                            }
                         }
-                    }
-                }.awaitAll()
+                    }.awaitAll()
+                }
+                newHomePageResponse("${request.name} • $yearName", items, hasNext = index + 1 < yearFolders.size)
+            } else {
+                // Flat layout: titles listed directly under the category (no year-folder layer).
+                val chunkSize = 30
+                val allMovies = topFolders.sortedBy { it.first.lowercase() }
+                val startIdx = (page - 1) * chunkSize
+                if (startIdx >= allMovies.size) {
+                    return newHomePageResponse(request.name, emptyList(), hasNext = false)
+                }
+                val pageItems = allMovies.drop(startIdx).take(chunkSize)
+
+                val items = coroutineScope {
+                    pageItems.map { (name, url, _) ->
+                        async {
+                            val title = cleanTitle(name)
+                            val year = yearOf(name)
+                            val poster = fetchPoster(title, year, false)
+                            newMovieSearchResponse(title, url, TvType.Movie) {
+                                this.posterUrl = poster
+                            }
+                        }
+                    }.awaitAll()
+                }
+                newHomePageResponse(request.name, items, hasNext = startIdx + chunkSize < allMovies.size)
             }
-            newHomePageResponse("${request.name} • $yearName", items, hasNext = index + 1 < yearFolders.size)
         } else {
             // SHOW: flat alphabetical listing, paginated manually since h5ai has no server paging.
             val chunkSize = 30
@@ -193,15 +245,12 @@ class FsPlusNetBdProvider : MainAPI() {
         if (q.isEmpty()) return emptyList()
 
         return coroutineScope {
-            // Movies: scan every year-folder in every movie category (parallel).
-            val movieYearJobs = movieCategories.values.map { basePath ->
-                async { sortYearFolders(listDir(basePath).filter { it.third }) }
+            // Movies: resolve title folders for every movie category (handles both
+            // year-layout and flat categories), then filter by query.
+            val movieTitleJobs = movieCategories.values.map { basePath ->
+                async { resolveMovieTitleFolders(basePath) }
             }
-            val movieYears = movieYearJobs.flatMap { it.await() }
-            val movieEntryJobs = movieYears.map { (_, yearUrl, _) ->
-                async { listDir(yearUrl.removePrefix("$mainUrl/")).filter { it.third } }
-            }
-            val movieEntries = movieEntryJobs.flatMap { it.await() }
+            val movieEntries = movieTitleJobs.flatMap { it.await() }
                 .filter { it.first.lowercase().contains(q) }
                 .map { (name, url, _) ->
                     newMovieSearchResponse(cleanTitle(name), url, TvType.Movie) { this.posterUrl = null }

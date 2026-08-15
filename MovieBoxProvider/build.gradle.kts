@@ -35,7 +35,7 @@ cloudstream {
     )
     requiresResources = true
 
-    iconUrl = "https://raw.githubusercontent.com/Hackershimul07/Cloudstream/refs/heads/main/MovieBoxProvider/icon.png"
+    iconUrl = "https://raw.githubusercontent.com/Hackershimul07/Cloudstream/refs/heads/master/MovieBoxProvider/icon.png"
 
     isCrossPlatform = false
 }

@@ -36,6 +36,16 @@ class FsPlusNetBdProvider : MainAPI() {
     private val yearFolderRegex = Regex("""^\d{4}(-\d{4})?$""")
     private val TMDB_API_KEY = "4ef0d7355d9ffb5151e987764708ce96"
 
+    // BDIX/h5ai servers commonly block or drop requests carrying the default OkHttp
+    // user-agent — normal (sequential) playback can slip through on the first
+    // connection, but a fresh Range request triggered by seeking gets rejected,
+    // which surfaces in the player as an IO error mid-scrub. A browser-like UA
+    // fixes this for both the initial request and subsequent seek requests.
+    private val streamHeaders = mapOf(
+        "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Referer" to mainUrl
+    )
+
     private val movieCategories = mapOf(
         "English Movies" to "Movies/English",
         "Hindi Movies" to "Movies/Hindi",
@@ -55,6 +65,29 @@ class FsPlusNetBdProvider : MainAPI() {
             showCategories.map { (name, path) -> MainPageData(name, "SHOW|$path") }
         ).toMutableList()
 
+    /**
+     * Percent-encodes characters that are safe for Jsoup/OkHttp to fetch HTML with,
+     * but break ExoPlayer's HttpDataSource when used as a final playback URL
+     * (raw spaces, parentheses, brackets, etc. in the file name).
+     * Leaves already-encoded sequences (%xx) untouched — uses java.net.URI as the
+     * primary strict parser, falling back to targeted manual replacement since URI
+     * throws on the exact "unescaped space" case we're trying to fix.
+     */
+    private fun safeEncodePath(url: String): String {
+        return try {
+            java.net.URI(url).toASCIIString()
+        } catch (e: Exception) {
+            url
+                .replace(" ", "%20")
+                .replace("(", "%28")
+                .replace(")", "%29")
+                .replace("[", "%5B")
+                .replace("]", "%5D")
+                .replace("'", "%27")
+                .replace("#", "%23")
+        }
+    }
+
     /** Parses an h5ai directory listing page into a list of (name, url, isFolder) entries. */
     private suspend fun listDir(path: String): List<Triple<String, String, Boolean>> {
         val url = "$mainUrl/${path.trim('/')}/"
@@ -71,7 +104,8 @@ class FsPlusNetBdProvider : MainAPI() {
             } catch (e: Exception) {
                 a.text().trim()
             }
-            val fullUrl = if (href.startsWith("http")) href else fixUrl(href)
+            val rawUrl = if (href.startsWith("http")) href else fixUrl(href)
+            val fullUrl = safeEncodePath(rawUrl)
             out.add(Triple(decodedName, fullUrl, isFolder))
         }
         return out
@@ -335,6 +369,7 @@ class FsPlusNetBdProvider : MainAPI() {
                 ) {
                     this.referer = mainUrl
                     this.quality = getQualityFromName(quality)
+                    this.headers = streamHeaders
                 }
             )
             return true
@@ -358,6 +393,7 @@ class FsPlusNetBdProvider : MainAPI() {
                 ) {
                     this.referer = mainUrl
                     this.quality = getQualityFromName(quality)
+                    this.headers = streamHeaders
                 }
             )
         }

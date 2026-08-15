@@ -35,5 +35,5 @@ cloudstream {
     )
     language = "bn"
 
-    iconUrl = "fmftp.net/mini-logo.png"
+    iconUrl = "https://fmftp.net/mini-logo.png"
 }

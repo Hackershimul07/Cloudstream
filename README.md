@@ -29,7 +29,7 @@ From now on, **Bangladeshi websites** will be added to this repo.
 https://raw.githubusercontent.com/hackershimul07/CloudStream/main/repo.json
 ```
 
-Or simply tap the button here 👉 **[Install Repo](https://raw.githubusercontent.com/hackershimul07/CloudStream/main/repo.json)**
+Or simply tap the button here 👉 **[Install Repo](https://raw.githubusercontent.com/hackershimul07/CloudStream/master/repo.json)**
 
 ---
 

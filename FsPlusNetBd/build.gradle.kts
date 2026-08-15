@@ -19,5 +19,5 @@ cloudstream {
 
     tvTypes = listOf("Movie", "TvSeries")
 
-    iconUrl = "https://fs.plus.net.bd/favicon.ico"
+    iconUrl = "https://raw.githubusercontent.com/Hackershimul07/Photo/refs/heads/main/images.png"
 }

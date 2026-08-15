@@ -8,6 +8,8 @@ import com.lagradost.cloudstream3.utils.newExtractorLink
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import org.json.JSONObject
 import java.net.URLDecoder
 import java.net.URLEncoder
@@ -91,29 +93,45 @@ class FsPlusNetBdProvider : MainAPI() {
     private fun extractNumber(raw: String): Int? = Regex("""\d+""").find(raw)?.value?.toIntOrNull()
 
     private val posterCache = HashMap<String, String?>()
+    // Limits concurrent TMDB calls so a burst of 30 posters on one page
+    // doesn't hit rate limiting and silently fail.
+    private val tmdbSemaphore = Semaphore(5)
 
     /** Looks up a poster on TMDB by title/year. Cached per-provider-instance. */
     private suspend fun fetchPoster(title: String, year: Int?, isTvSeries: Boolean): String? {
         val cacheKey = "$title|$year|$isTvSeries"
         if (posterCache.containsKey(cacheKey)) return posterCache[cacheKey]
-        val poster = try {
-            val endpoint = if (isTvSeries) "tv" else "movie"
-            val yearParam = when {
-                year == null -> ""
-                isTvSeries -> "&first_air_date_year=$year"
-                else -> "&year=$year"
+        val poster = tmdbSemaphore.withPermit {
+            try {
+                val endpoint = if (isTvSeries) "tv" else "movie"
+                val yearParam = when {
+                    year == null -> ""
+                    isTvSeries -> "&first_air_date_year=$year"
+                    else -> "&year=$year"
+                }
+                val query = URLEncoder.encode(title, "UTF-8")
+                val apiUrl = "https://api.themoviedb.org/3/search/$endpoint?api_key=$TMDB_API_KEY&query=$query$yearParam"
+
+                // Retry once on failure (covers transient rate-limit / network hiccups).
+                var body: String? = null
+                repeat(2) { attempt ->
+                    if (body == null) {
+                        try {
+                            body = app.get(apiUrl).text
+                        } catch (e: Exception) {
+                            if (attempt == 0) kotlinx.coroutines.delay(400)
+                        }
+                    }
+                }
+                val json = JSONObject(body ?: return@withPermit null)
+                val results = json.optJSONArray("results")
+                val posterPath = if (results != null && results.length() > 0) {
+                    results.getJSONObject(0).optString("poster_path", "")
+                } else ""
+                if (posterPath.isNotBlank()) "https://image.tmdb.org/t/p/w500$posterPath" else null
+            } catch (e: Exception) {
+                null
             }
-            val query = URLEncoder.encode(title, "UTF-8")
-            val apiUrl = "https://api.themoviedb.org/3/search/$endpoint?api_key=$TMDB_API_KEY&query=$query$yearParam"
-            val body = app.get(apiUrl).text
-            val json = JSONObject(body)
-            val results = json.optJSONArray("results")
-            val posterPath = if (results != null && results.length() > 0) {
-                results.getJSONObject(0).optString("poster_path", "")
-            } else ""
-            if (posterPath.isNotBlank()) "https://image.tmdb.org/t/p/w500$posterPath" else null
-        } catch (e: Exception) {
-            null
         }
         posterCache[cacheKey] = poster
         return poster

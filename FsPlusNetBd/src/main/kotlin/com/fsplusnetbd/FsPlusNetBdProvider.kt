@@ -143,13 +143,16 @@ class FsPlusNetBdProvider : MainAPI() {
     private fun extractNumber(raw: String): Int? = Regex("""\d+""").find(raw)?.value?.toIntOrNull()
 
     private val posterCache = HashMap<String, String?>()
-    // Limits concurrent TMDB calls so a burst of 30 posters on one page
-    // doesn't hit rate limiting and silently fail.
-    private val tmdbSemaphore = Semaphore(5)
+    // Limits concurrent TMDB calls so a burst of posters on one page doesn't hit
+    // rate limiting. With the smaller 16-item chunk size, this now covers almost
+    // a whole page's worth of posters in a single concurrent batch.
+    private val tmdbSemaphore = Semaphore(16)
     // Hard cap on how long a single page is allowed to wait on poster lookups
-    // before it falls back to showing items without posters. Prevents one slow/
-    // rate-limited TMDB response from freezing the whole home page.
-    private val posterBudgetMs = 8000L
+    // before it falls back to showing items without posters. Raised from 8s -> 25s
+    // now that listDir() has its own 15s bound, so this timeout is purely a safety
+    // net rather than the main thing preventing a hang — we can afford to give
+    // posters more room to actually finish instead of falling back early.
+    private val posterBudgetMs = 25000L
 
     /** Looks up a poster on TMDB by title/year. Cached per-provider-instance. */
     private suspend fun fetchPoster(title: String, year: Int?, isTvSeries: Boolean): String? {
@@ -166,16 +169,12 @@ class FsPlusNetBdProvider : MainAPI() {
                 val query = URLEncoder.encode(title, "UTF-8")
                 val apiUrl = "https://api.themoviedb.org/3/search/$endpoint?api_key=$TMDB_API_KEY&query=$query$yearParam"
 
-                // Retry once on failure (covers transient rate-limit / network hiccups).
-                var body: String? = null
-                repeat(2) { attempt ->
-                    if (body == null) {
-                        try {
-                            body = app.get(apiUrl).text
-                        } catch (e: Exception) {
-                            if (attempt == 0) kotlinx.coroutines.delay(400)
-                        }
-                    }
+                // Single attempt only — retry+delay here just eats into the shared
+                // posterBudgetMs and slows down every other item on the page.
+                val body = try {
+                    app.get(apiUrl).text
+                } catch (e: Exception) {
+                    null
                 }
                 val json = JSONObject(body ?: return@withPermit null)
                 val results = json.optJSONArray("results")
@@ -242,7 +241,9 @@ class FsPlusNetBdProvider : MainAPI() {
                 newHomePageResponse("${request.name} • $yearName", items, hasNext = index + 1 < yearFolders.size)
             } else {
                 // Flat layout: titles listed directly under the category (no year-folder layer).
-                val chunkSize = 30
+                // Smaller chunk = fewer poster lookups per page = faster initial open.
+                // Remaining titles still load fine on scroll via the next page.
+                val chunkSize = 16
                 val allMovies = topFolders.sortedBy { it.first.lowercase() }
                 val startIdx = (page - 1) * chunkSize
                 if (startIdx >= allMovies.size) {
@@ -270,7 +271,8 @@ class FsPlusNetBdProvider : MainAPI() {
             }
         } else {
             // SHOW: flat alphabetical listing, paginated manually since h5ai has no server paging.
-            val chunkSize = 30
+            // Smaller chunk = fewer poster lookups per page = faster initial open.
+            val chunkSize = 16
             val allShows = listDir(basePath).filter { it.third }.sortedBy { it.first.lowercase() }
             val startIdx = (page - 1) * chunkSize
             if (startIdx >= allShows.size) {

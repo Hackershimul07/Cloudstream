@@ -1,5 +1,5 @@
 // use an integer for version numbers
-version = 1
+version = 2
 
 android {
     namespace = "com.niloy"
@@ -23,4 +23,5 @@ cloudstream {
         "Anime"
     )
     language = "bn"
+iconUrl = "https://raw.githubusercontent.com/Hackershimul07/Photo/refs/heads/main/images.jpeg"
 }

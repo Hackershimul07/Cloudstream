@@ -5,6 +5,8 @@ import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.INFER_TYPE
 import com.lagradost.cloudstream3.utils.getQualityFromName
 import com.lagradost.cloudstream3.utils.newExtractorLink
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import java.net.URLDecoder
 
 /**
@@ -106,16 +108,16 @@ class FsPlusNetBdProvider : MainAPI() {
         // h5ai has no server-side search API, so we scan every year-folder
         // in every category. Fetched in parallel (per year) to keep it
         // reasonably fast despite covering the full archive.
-        return kotlinx.coroutines.coroutineScope {
+        return coroutineScope {
             val allYearJobs = categories.values.map { basePath ->
-                kotlinx.coroutines.async {
+                async {
                     sortYearFolders(listDir(basePath).filter { it.third })
                 }
             }
             val allYears = allYearJobs.flatMap { it.await() }
 
             val entryJobs = allYears.map { (_, yearUrl, _) ->
-                kotlinx.coroutines.async {
+                async {
                     listDir(yearUrl.removePrefix("$mainUrl/")).filter { it.third }
                 }
             }

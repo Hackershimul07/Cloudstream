@@ -6,14 +6,18 @@ import com.lagradost.cloudstream3.utils.INFER_TYPE
 import com.lagradost.cloudstream3.utils.getQualityFromName
 import com.lagradost.cloudstream3.utils.newExtractorLink
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import org.json.JSONObject
 import java.net.URLDecoder
+import java.net.URLEncoder
 
 /**
  * Provider for fs.plus.net.bd — an h5ai powered BDIX file server.
- * Structure: /Movies|Shows/<Language>/<Year-folder>/<Title (Year)>/<file>.mp4
- * Same directory-listing pattern as BdixDhakaFlix, so the parsing logic
- * (dynamic year-folder detection, reverse-chronological ordering) is reused.
+ *
+ * Movies:  /Movies/<Language>/<Year-folder>/<Title (Year)>/<file>.mp4
+ * Shows:   /Shows/<Tv-Shows|Anime-Shows|Indian-Web-Series>/<Title (Year)>/Season X/<file>.mp4
+ *          (shows are listed directly, alphabetically — no year-folder layer)
  */
 class FsPlusNetBdProvider : MainAPI() {
     override var mainUrl = "https://fs.plus.net.bd"
@@ -23,17 +27,27 @@ class FsPlusNetBdProvider : MainAPI() {
     override val hasDownloadSupport = true
     override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
 
-    // category name -> path on the server
-    private val categories = mapOf(
+    private val videoRegex = Regex(""".*\.(mp4|mkv|avi|webm)$""", RegexOption.IGNORE_CASE)
+    private val TMDB_API_KEY = "4ef0d7355d9ffb5151e987764708ce96"
+
+    private val movieCategories = mapOf(
         "English Movies" to "Movies/English",
         "Hindi Movies" to "Movies/Hindi",
         "Indian Bangla Movies" to "Movies/Indian-Bangla",
         "South Indian Movies" to "Movies/South-Indian",
-        "Asian / Anime Movies" to "Movies/Asian-Anime",
-        "TV Shows" to "Shows"
+        "Asian / Anime Movies" to "Movies/Asian-Anime"
     )
 
-    override val mainPage = categories.map { (name, path) -> MainPageData(name, path) }.toMutableList()
+    private val showCategories = mapOf(
+        "TV Shows" to "Shows/Tv-Shows",
+        "Anime Shows" to "Shows/Anime-Shows",
+        "Indian Web Series" to "Shows/Indian-Web-Series"
+    )
+
+    override val mainPage = (
+        movieCategories.map { (name, path) -> MainPageData(name, "MOVIE|$path") } +
+            showCategories.map { (name, path) -> MainPageData(name, "SHOW|$path") }
+        ).toMutableList()
 
     /** Parses an h5ai directory listing page into a list of (name, url, isFolder) entries. */
     private suspend fun listDir(path: String): List<Triple<String, String, Boolean>> {
@@ -63,74 +77,129 @@ class FsPlusNetBdProvider : MainAPI() {
             val singleYear = Regex("""^(\d{4})$""").find(name)
             if (singleYear != null) return singleYear.groupValues[1].toInt()
             val range = Regex("""^(\d{4})-(\d{4})$""").find(name)
-            if (range != null) return range.groupValues[2].toInt() // sort by range end
+            if (range != null) return range.groupValues[2].toInt()
             return 0
         }
         return folders.sortedByDescending { keyFor(it.first) }
     }
 
-    private fun cleanTitle(raw: String): String {
-        // "Movie Name (2026)" -> "Movie Name"
-        return raw.replace(Regex("""\s*\(\d{4}\)\s*$"""), "").trim()
-    }
+    private fun cleanTitle(raw: String): String = raw.replace(Regex("""\s*\(\d{4}\)\s*$"""), "").trim()
 
     private fun yearOf(raw: String): Int? =
         Regex("""\((\d{4})\)\s*$""").find(raw)?.groupValues?.get(1)?.toIntOrNull()
 
-    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val basePath = request.data
-        val yearFolders = sortYearFolders(listDir(basePath).filter { it.third })
+    private fun extractNumber(raw: String): Int? = Regex("""\d+""").find(raw)?.value?.toIntOrNull()
 
-        // Each "page" (load-more) walks one more year-folder deeper.
-        val index = page - 1
-        if (index >= yearFolders.size) {
-            return newHomePageResponse(request.name, emptyList(), hasNext = false)
-        }
-        val (yearName, yearUrl, _) = yearFolders[index]
-        val entries = listDir(yearUrl.removePrefix("$mainUrl/")).filter { it.third }
+    private val posterCache = HashMap<String, String?>()
 
-        val items = entries.map { (name, url, _) ->
-            newMovieSearchResponse(cleanTitle(name), url, TvType.Movie) {
-                this.posterUrl = null
+    /** Looks up a poster on TMDB by title/year. Cached per-provider-instance. */
+    private suspend fun fetchPoster(title: String, year: Int?, isTvSeries: Boolean): String? {
+        val cacheKey = "$title|$year|$isTvSeries"
+        if (posterCache.containsKey(cacheKey)) return posterCache[cacheKey]
+        val poster = try {
+            val endpoint = if (isTvSeries) "tv" else "movie"
+            val yearParam = when {
+                year == null -> ""
+                isTvSeries -> "&first_air_date_year=$year"
+                else -> "&year=$year"
             }
+            val query = URLEncoder.encode(title, "UTF-8")
+            val apiUrl = "https://api.themoviedb.org/3/search/$endpoint?api_key=$TMDB_API_KEY&query=$query$yearParam"
+            val body = app.get(apiUrl).text
+            val json = JSONObject(body)
+            val results = json.optJSONArray("results")
+            val posterPath = if (results != null && results.length() > 0) {
+                results.getJSONObject(0).optString("poster_path", "")
+            } else ""
+            if (posterPath.isNotBlank()) "https://image.tmdb.org/t/p/w500$posterPath" else null
+        } catch (e: Exception) {
+            null
         }
-        return newHomePageResponse(
-            "${request.name} • $yearName",
-            items,
-            hasNext = index + 1 < yearFolders.size
-        )
+        posterCache[cacheKey] = poster
+        return poster
+    }
+
+    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+        val (type, basePath) = request.data.split("|", limit = 2)
+
+        return if (type == "MOVIE") {
+            val yearFolders = sortYearFolders(listDir(basePath).filter { it.third })
+            val index = page - 1
+            if (index >= yearFolders.size) {
+                return newHomePageResponse(request.name, emptyList(), hasNext = false)
+            }
+            val (yearName, yearUrl, _) = yearFolders[index]
+            val entries = listDir(yearUrl.removePrefix("$mainUrl/")).filter { it.third }
+
+            val items = coroutineScope {
+                entries.map { (name, url, _) ->
+                    async {
+                        val title = cleanTitle(name)
+                        val year = yearOf(name)
+                        val poster = fetchPoster(title, year, false)
+                        newMovieSearchResponse(title, url, TvType.Movie) {
+                            this.posterUrl = poster
+                        }
+                    }
+                }.awaitAll()
+            }
+            newHomePageResponse("${request.name} • $yearName", items, hasNext = index + 1 < yearFolders.size)
+        } else {
+            // SHOW: flat alphabetical listing, paginated manually since h5ai has no server paging.
+            val chunkSize = 30
+            val allShows = listDir(basePath).filter { it.third }.sortedBy { it.first.lowercase() }
+            val startIdx = (page - 1) * chunkSize
+            if (startIdx >= allShows.size) {
+                return newHomePageResponse(request.name, emptyList(), hasNext = false)
+            }
+            val pageItems = allShows.drop(startIdx).take(chunkSize)
+
+            val items = coroutineScope {
+                pageItems.map { (name, url, _) ->
+                    async {
+                        val title = cleanTitle(name)
+                        val year = yearOf(name)
+                        val poster = fetchPoster(title, year, true)
+                        newTvSeriesSearchResponse(title, url, TvType.TvSeries) {
+                            this.posterUrl = poster
+                        }
+                    }
+                }.awaitAll()
+            }
+            newHomePageResponse(request.name, items, hasNext = startIdx + chunkSize < allShows.size)
+        }
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
         val q = query.trim().lowercase()
         if (q.isEmpty()) return emptyList()
 
-        // h5ai has no server-side search API, so we scan every year-folder
-        // in every category. Fetched in parallel (per year) to keep it
-        // reasonably fast despite covering the full archive.
         return coroutineScope {
-            val allYearJobs = categories.values.map { basePath ->
-                async {
-                    sortYearFolders(listDir(basePath).filter { it.third })
-                }
+            // Movies: scan every year-folder in every movie category (parallel).
+            val movieYearJobs = movieCategories.values.map { basePath ->
+                async { sortYearFolders(listDir(basePath).filter { it.third }) }
             }
-            val allYears = allYearJobs.flatMap { it.await() }
-
-            val entryJobs = allYears.map { (_, yearUrl, _) ->
-                async {
-                    listDir(yearUrl.removePrefix("$mainUrl/")).filter { it.third }
-                }
+            val movieYears = movieYearJobs.flatMap { it.await() }
+            val movieEntryJobs = movieYears.map { (_, yearUrl, _) ->
+                async { listDir(yearUrl.removePrefix("$mainUrl/")).filter { it.third } }
             }
-            val allEntries = entryJobs.flatMap { it.await() }
-
-            allEntries
+            val movieEntries = movieEntryJobs.flatMap { it.await() }
                 .filter { it.first.lowercase().contains(q) }
                 .map { (name, url, _) ->
-                    newMovieSearchResponse(cleanTitle(name), url, TvType.Movie) {
-                        this.posterUrl = null
-                    }
+                    newMovieSearchResponse(cleanTitle(name), url, TvType.Movie) { this.posterUrl = null }
                 }
-                .distinctBy { it.url }
+
+            // Shows: flat listing, no year layer, scanned directly.
+            val showEntryJobs = showCategories.values.map { basePath ->
+                async { listDir(basePath).filter { it.third } }
+            }
+            val showEntries = showEntryJobs.flatMap { it.await() }
+                .filter { it.first.lowercase().contains(q) }
+                .map { (name, url, _) ->
+                    newTvSeriesSearchResponse(cleanTitle(name), url, TvType.TvSeries) { this.posterUrl = null }
+                }
+
+            (movieEntries + showEntries).distinctBy { it.url }
         }
     }
 
@@ -141,13 +210,41 @@ class FsPlusNetBdProvider : MainAPI() {
         val title = cleanTitle(folderName)
         val year = yearOf(folderName)
 
-        // Direct movie files sit right inside this folder.
-        val videoFiles = entries.filter { !it.third && it.first.matches(Regex(""".*\.(mp4|mkv|avi|webm)$""", RegexOption.IGNORE_CASE)) }
+        val seasonFolders = entries.filter { it.third && it.first.contains("season", ignoreCase = true) }
 
-        return newMovieLoadResponse(title, url, TvType.Movie, url) {
-            this.year = year
-            this.plot = "Source: fs.plus.net.bd\n" + videoFiles.joinToString("\n") { it.first }
-            this.posterUrl = null
+        return if (seasonFolders.isNotEmpty()) {
+            // TV series: gather episodes from every Season folder.
+            val episodes = ArrayList<Episode>()
+            for ((seasonName, seasonUrl, _) in seasonFolders.sortedBy { extractNumber(it.first) ?: 0 }) {
+                val seasonNum = extractNumber(seasonName) ?: 1
+                val epEntries = listDir(seasonUrl.removePrefix("$mainUrl/"))
+                    .filter { !it.third && it.first.matches(videoRegex) }
+                    .sortedBy { it.first }
+                epEntries.forEachIndexed { idx, (epName, epUrl, _) ->
+                    val epNum = Regex("""[Ee](\d{1,3})""").find(epName)?.groupValues?.get(1)?.toIntOrNull() ?: (idx + 1)
+                    episodes.add(
+                        newEpisode(epUrl) {
+                            this.name = epName
+                            this.season = seasonNum
+                            this.episode = epNum
+                        }
+                    )
+                }
+            }
+            val poster = fetchPoster(title, year, true)
+            newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
+                this.year = year
+                this.posterUrl = poster
+                this.plot = "Source: fs.plus.net.bd"
+            }
+        } else {
+            val videoFiles = entries.filter { !it.third && it.first.matches(videoRegex) }
+            val poster = fetchPoster(title, year, false)
+            newMovieLoadResponse(title, url, TvType.Movie, url) {
+                this.year = year
+                this.posterUrl = poster
+                this.plot = "Source: fs.plus.net.bd\n" + videoFiles.joinToString("\n") { it.first }
+            }
         }
     }
 
@@ -157,16 +254,34 @@ class FsPlusNetBdProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+        // TV episodes: `data` is already a direct file URL from load().
+        if (data.matches(videoRegex)) {
+            val name = URLDecoder.decode(data.substringAfterLast('/'), "UTF-8")
+            val quality = Regex("""(2160p|1080p|720p|480p|360p)""", RegexOption.IGNORE_CASE)
+                .find(name)?.value ?: "Unknown"
+            callback(
+                newExtractorLink(
+                    source = this.name,
+                    name = "$name [$quality]",
+                    url = data,
+                    type = INFER_TYPE
+                ) {
+                    this.referer = mainUrl
+                    this.quality = getQualityFromName(quality)
+                }
+            )
+            return true
+        }
+
+        // Movies: `data` is a folder URL, list video files inside it.
         val path = data.removePrefix("$mainUrl/")
         val entries = listDir(path)
-        val videoFiles = entries.filter { !it.third && it.first.matches(Regex(""".*\.(mp4|mkv|avi|webm)$""", RegexOption.IGNORE_CASE)) }
-
+        val videoFiles = entries.filter { !it.third && it.first.matches(videoRegex) }
         if (videoFiles.isEmpty()) return false
 
         for ((name, fileUrl, _) in videoFiles) {
             val quality = Regex("""(2160p|1080p|720p|480p|360p)""", RegexOption.IGNORE_CASE)
                 .find(name)?.value ?: "Unknown"
-
             callback(
                 newExtractorLink(
                     source = this.name,

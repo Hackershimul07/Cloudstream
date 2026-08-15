@@ -88,27 +88,35 @@ class FsPlusNetBdProvider : MainAPI() {
         }
     }
 
-    /** Parses an h5ai directory listing page into a list of (name, url, isFolder) entries. */
+    /** Parses an h5ai directory listing page into a list of (name, url, isFolder) entries.
+     *  Bounded to 15s and never throws — a slow or failed request returns an empty
+     *  list instead of hanging the whole page load indefinitely. */
     private suspend fun listDir(path: String): List<Triple<String, String, Boolean>> {
         val url = "$mainUrl/${path.trim('/')}/"
-        val doc = app.get(url).document
-        val rows = doc.select("table#fallback tr, table.fallback tr, tr")
-        val out = ArrayList<Triple<String, String, Boolean>>()
-        for (row in rows) {
-            val a = row.selectFirst("td.fb-n a, a") ?: continue
-            val href = a.attr("href")
-            if (href.isBlank() || href.contains("..") || a.text().trim().equals("Parent Directory", true)) continue
-            val isFolder = href.endsWith("/")
-            val decodedName = try {
-                URLDecoder.decode(href.trimEnd('/').substringAfterLast('/'), "UTF-8")
-            } catch (e: Exception) {
-                a.text().trim()
-            }
-            val rawUrl = if (href.startsWith("http")) href else fixUrl(href)
-            val fullUrl = safeEncodePath(rawUrl)
-            out.add(Triple(decodedName, fullUrl, isFolder))
+        return try {
+            kotlinx.coroutines.withTimeoutOrNull(15000L) {
+                val doc = app.get(url).document
+                val rows = doc.select("table#fallback tr, table.fallback tr, tr")
+                val out = ArrayList<Triple<String, String, Boolean>>()
+                for (row in rows) {
+                    val a = row.selectFirst("td.fb-n a, a") ?: continue
+                    val href = a.attr("href")
+                    if (href.isBlank() || href.contains("..") || a.text().trim().equals("Parent Directory", true)) continue
+                    val isFolder = href.endsWith("/")
+                    val decodedName = try {
+                        URLDecoder.decode(href.trimEnd('/').substringAfterLast('/'), "UTF-8")
+                    } catch (e: Exception) {
+                        a.text().trim()
+                    }
+                    val rawUrl = if (href.startsWith("http")) href else fixUrl(href)
+                    val fullUrl = safeEncodePath(rawUrl)
+                    out.add(Triple(decodedName, fullUrl, isFolder))
+                }
+                out
+            } ?: emptyList()
+        } catch (e: Exception) {
+            emptyList()
         }
-        return out
     }
 
     /** True if every folder name in the list looks like a year or year-range (e.g. "2014", "2001-2010"). */
@@ -138,6 +146,10 @@ class FsPlusNetBdProvider : MainAPI() {
     // Limits concurrent TMDB calls so a burst of 30 posters on one page
     // doesn't hit rate limiting and silently fail.
     private val tmdbSemaphore = Semaphore(5)
+    // Hard cap on how long a single page is allowed to wait on poster lookups
+    // before it falls back to showing items without posters. Prevents one slow/
+    // rate-limited TMDB response from freezing the whole home page.
+    private val posterBudgetMs = 8000L
 
     /** Looks up a poster on TMDB by title/year. Cached per-provider-instance. */
     private suspend fun fetchPoster(title: String, year: Int?, isTvSeries: Boolean): String? {
@@ -211,17 +223,21 @@ class FsPlusNetBdProvider : MainAPI() {
                 val (yearName, yearUrl, _) = yearFolders[index]
                 val entries = listDir(yearUrl.removePrefix("$mainUrl/")).filter { it.third }
 
-                val items = coroutineScope {
-                    entries.map { (name, url, _) ->
-                        async {
-                            val title = cleanTitle(name)
-                            val year = yearOf(name)
-                            val poster = fetchPoster(title, year, false)
-                            newMovieSearchResponse(title, url, TvType.Movie) {
-                                this.posterUrl = poster
+                val items = kotlinx.coroutines.withTimeoutOrNull(posterBudgetMs) {
+                    coroutineScope {
+                        entries.map { (name, url, _) ->
+                            async {
+                                val title = cleanTitle(name)
+                                val year = yearOf(name)
+                                val poster = fetchPoster(title, year, false)
+                                newMovieSearchResponse(title, url, TvType.Movie) {
+                                    this.posterUrl = poster
+                                }
                             }
-                        }
-                    }.awaitAll()
+                        }.awaitAll()
+                    }
+                } ?: entries.map { (name, url, _) ->
+                    newMovieSearchResponse(cleanTitle(name), url, TvType.Movie) { this.posterUrl = null }
                 }
                 newHomePageResponse("${request.name} • $yearName", items, hasNext = index + 1 < yearFolders.size)
             } else {
@@ -234,17 +250,21 @@ class FsPlusNetBdProvider : MainAPI() {
                 }
                 val pageItems = allMovies.drop(startIdx).take(chunkSize)
 
-                val items = coroutineScope {
-                    pageItems.map { (name, url, _) ->
-                        async {
-                            val title = cleanTitle(name)
-                            val year = yearOf(name)
-                            val poster = fetchPoster(title, year, false)
-                            newMovieSearchResponse(title, url, TvType.Movie) {
-                                this.posterUrl = poster
+                val items = kotlinx.coroutines.withTimeoutOrNull(posterBudgetMs) {
+                    coroutineScope {
+                        pageItems.map { (name, url, _) ->
+                            async {
+                                val title = cleanTitle(name)
+                                val year = yearOf(name)
+                                val poster = fetchPoster(title, year, false)
+                                newMovieSearchResponse(title, url, TvType.Movie) {
+                                    this.posterUrl = poster
+                                }
                             }
-                        }
-                    }.awaitAll()
+                        }.awaitAll()
+                    }
+                } ?: pageItems.map { (name, url, _) ->
+                    newMovieSearchResponse(cleanTitle(name), url, TvType.Movie) { this.posterUrl = null }
                 }
                 newHomePageResponse(request.name, items, hasNext = startIdx + chunkSize < allMovies.size)
             }
@@ -258,17 +278,21 @@ class FsPlusNetBdProvider : MainAPI() {
             }
             val pageItems = allShows.drop(startIdx).take(chunkSize)
 
-            val items = coroutineScope {
-                pageItems.map { (name, url, _) ->
-                    async {
-                        val title = cleanTitle(name)
-                        val year = yearOf(name)
-                        val poster = fetchPoster(title, year, true)
-                        newTvSeriesSearchResponse(title, url, TvType.TvSeries) {
-                            this.posterUrl = poster
+            val items = kotlinx.coroutines.withTimeoutOrNull(posterBudgetMs) {
+                coroutineScope {
+                    pageItems.map { (name, url, _) ->
+                        async {
+                            val title = cleanTitle(name)
+                            val year = yearOf(name)
+                            val poster = fetchPoster(title, year, true)
+                            newTvSeriesSearchResponse(title, url, TvType.TvSeries) {
+                                this.posterUrl = poster
+                            }
                         }
-                    }
-                }.awaitAll()
+                    }.awaitAll()
+                }
+            } ?: pageItems.map { (name, url, _) ->
+                newTvSeriesSearchResponse(cleanTitle(name), url, TvType.TvSeries) { this.posterUrl = null }
             }
             newHomePageResponse(request.name, items, hasNext = startIdx + chunkSize < allShows.size)
         }

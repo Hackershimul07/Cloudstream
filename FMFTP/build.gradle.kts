@@ -1,5 +1,5 @@
 // use an integer for version numbers
-version = 3
+version = 4
 
 android {
     namespace = "com.niloy"
@@ -35,5 +35,5 @@ cloudstream {
     )
     language = "bn"
 
-    iconUrl = "https://fmftp.net/favicon.ico"
+    iconUrl = "fmftp.net/mini-logo.png"
 }

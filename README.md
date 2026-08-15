@@ -4,7 +4,7 @@
 
 **A curated Cloudstream extension repository focused on Bangladeshi websites**
 
-[![Install Repo](https://img.shields.io/badge/📲%20Install-Repo-blueviolet?style=for-the-badge)](https://raw.githubusercontent.com/hackershimul07/CloudStream/main/repo.json)
+[![Install Repo](https://img.shields.io/badge/📲%20Install-Repo-blueviolet?style=for-the-badge)](https://raw.githubusercontent.com/hackershimul07/CloudStream/master/repo.json)
 
 </div>
 
@@ -26,7 +26,7 @@ From now on, **Bangladeshi websites** will be added to this repo.
 4. Paste the link below:
 
 ```
-https://raw.githubusercontent.com/hackershimul07/CloudStream/main/repo.json
+https://raw.githubusercontent.com/hackershimul07/CloudStream/master/repo.json
 ```
 
 Or simply tap the button here 👉 **[Install Repo](https://raw.githubusercontent.com/hackershimul07/CloudStream/master/repo.json)**

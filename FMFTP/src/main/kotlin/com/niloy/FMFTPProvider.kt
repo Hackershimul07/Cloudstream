@@ -170,12 +170,11 @@ class FMFTPProvider : MainAPI() {
         "$mainUrl/api/movies?limit=20&fields=id,title,genre,year,views,download,online_rating,release_date,poster_path,backdrop_path&library=1&page=1&sort=release_date" to "Bollywood Movies",
         "$mainUrl/api/movies?limit=20&fields=id,title,genre,year,views,download,online_rating,release_date,poster_path,backdrop_path&library=5&page=1&sort=release_date" to "Hindi Dubbed",
         "$mainUrl/api/movies?limit=20&fields=id,title,genre,year,views,download,online_rating,release_date,poster_path,backdrop_path&library=7&page=1&sort=release_date" to "Bangla Movies",
-        //"$mainUrl/api/movies?limit=20&fields=id,title,genre,year,views,download,online_rating,release_date,poster_path,backdrop_path&library=2&page=1&sort=release_date" to "Hollywood Movies",
+        "$mainUrl/api/movies?limit=20&fields=id,title,genre,year,views,download,online_rating,release_date,poster_path,backdrop_path&library=3&page=1&sort=release_date" to "Animation",
         //"$mainUrl/api/tv-shows?limit=20&library=9&page=1&sort=release_date" to "English TV Shows",
         "$mainUrl/api/tv-shows?limit=20&library=10&page=1&sort=release_date" to "Hindi TV Shows",
         //"$mainUrl/api/tv-shows?limit=20&library=11&page=1&sort=release_date" to "Korean TV Shows",
-        "$mainUrl/api/tv-shows?limit=20&library=12&page=1&sort=release_date" to "Bangla TV Shows",
-        "$mainUrl/api/movies?limit=20&fields=id,title,genre,year,views,download,online_rating,release_date,poster_path,backdrop_path&library=3&page=1&sort=release_date" to "Animation"
+        "$mainUrl/api/tv-shows?limit=20&library=12&page=1&sort=release_date" to "Bangla TV Shows"
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {

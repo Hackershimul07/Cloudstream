@@ -1,64 +1,16 @@
-import com.lagradost.cloudstream3.gradle.CloudstreamExtension
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-
-buildscript {
-    repositories {
-        google()
-        mavenCentral()
-        maven("https://jitpack.io")
-    }
-    dependencies {
-        classpath("com.android.tools.build:gradle:8.7.3")
-        classpath("com.github.recloudstream:gradle:master-SNAPSHOT")
-        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.20")
-    }
-}
-
-apply(plugin = "com.android.library")
-apply(plugin = "com.lagradost.cloudstream3.gradle")
-
-// version নম্বরের জন্য integer ব্যবহার করুন
+// use an integer for version numbers
 version = 1
 
-configure<CloudstreamExtension> {
-    description = "Download Latest Bollywood, Hollywood and South Movies"
-    authors = listOf("shimul")
+cloudstream {
+    description = "DesireMovies"
+    language    = "hi"
+    authors     = listOf("Shimul_Ahmed")
 
-    // 0: Down, 1: Ok, 2: Slow, 3: Beta only
-    status = 1
+    status = 1 // will be 3 if unspecified
 
-    tvTypes = listOf("Movie")
-    language = "bn"   // যদি শুধু হিন্দি/বলিউড কনটেন্ট না হয়, "en" দিন
-    iconUrl = "https://1desiremovies.wales/wp-content/uploads/2023/04/cropped-image_processing20210911-26622-fplmvm-192x192.png"
-}
+    tvTypes = listOf("Movie", "TvSeries")
 
-android {
-    namespace = "shimul.com"
-    compileSdk = 34
+    iconUrl = "https://www.google.com/s2/favicons?domain=1desiremovies.wales&sz=%size%"
 
-    defaultConfig {
-        minSdk = 21
-    }
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
-    }
-
-    tasks.withType<KotlinCompile> {
-        kotlinOptions {
-            jvmTarget = "1.8"
-            freeCompilerArgs = freeCompilerArgs + "-Xjvm-default=all"
-        }
-    }
-}
-
-repositories {
-    google()
-    mavenCentral()
-    maven("https://jitpack.io")
-}
-
-dependencies {
-    compileOnly("com.github.recloudstream:cloudstream:master-SNAPSHOT")
+    isCrossPlatform = true
 }

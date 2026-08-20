@@ -126,7 +126,7 @@ class HubCloudExtractor {
 
         val fileName = driveDoc.selectFirst(".card-header")?.text()
             ?: driveDoc.title()
-        val detectedQuality = getQualityFromName(fileName).value
+        val detectedQuality = getQualityFromName(fileName)
 
         val finalDoc = app.get(generatePageUrl, referer = driveUrl).document
 

@@ -118,12 +118,14 @@ class HubCloudExtractor {
     suspend fun getUrl(driveUrl: String, referer: String): List<ExtractorLink> {
         val links = mutableListOf<ExtractorLink>()
 
-        // ধাপ ১: hubcloud.cx/drive/{id} পেজ থেকে জেনারেট বাটনের href বের করা
         val driveDoc = app.get(driveUrl, referer = referer).document
         val generatePageUrl = driveDoc.selectFirst("#download")?.attr("href") ?: return links
 
-        // ধাপ ২: gamerxyt.com/hubcloud.php পেজ থেকে সব মিরর বের করা
-        // এই পেজ Referer চেক করে bot detect করে — তাই hubcloud.cx পেজকেই referer হিসেবে পাঠানো হচ্ছে
+        // ফাইলের নাম থেকে আসল কোয়ালিটি বের করা (card-header-এ থাকে)
+        val fileName = driveDoc.selectFirst(".card-header")?.text()
+            ?: driveDoc.title()
+        val detectedQuality = Qualities.getQualityFromName(fileName).value
+
         val finalDoc = app.get(generatePageUrl, referer = driveUrl).document
 
         finalDoc.select("a").forEach { el ->
@@ -140,7 +142,7 @@ class HubCloudExtractor {
                             type = ExtractorLinkType.VIDEO
                         ) {
                             this.referer = generatePageUrl
-                            this.quality = Qualities.P1080.value
+                            this.quality = detectedQuality
                         }
                     )
                 }
@@ -154,7 +156,7 @@ class HubCloudExtractor {
                             type = ExtractorLinkType.VIDEO
                         ) {
                             this.referer = generatePageUrl
-                            this.quality = Qualities.P1080.value
+                            this.quality = detectedQuality
                         }
                     )
                 }
@@ -168,7 +170,7 @@ class HubCloudExtractor {
                             type = ExtractorLinkType.VIDEO
                         ) {
                             this.referer = generatePageUrl
-                            this.quality = Qualities.P1080.value
+                            this.quality = detectedQuality
                         }
                     )
                 }
@@ -182,7 +184,7 @@ class HubCloudExtractor {
                             type = ExtractorLinkType.VIDEO
                         ) {
                             this.referer = generatePageUrl
-                            this.quality = Qualities.P1080.value
+                            this.quality = detectedQuality
                         }
                     )
                 }

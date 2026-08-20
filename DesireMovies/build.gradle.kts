@@ -15,7 +15,6 @@ buildscript {
 }
 
 apply(plugin = "com.android.library")
-apply(plugin = "kotlin-android")
 apply(plugin = "com.lagradost.cloudstream3.gradle")
 
 // version নম্বরের জন্য integer ব্যবহার করুন

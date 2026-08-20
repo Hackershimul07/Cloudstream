@@ -4,7 +4,7 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.ExtractorLinkType
-import com.lagradost.cloudstream3.utils.Qualities
+import com.lagradost.cloudstream3.utils.getQualityFromName
 import com.lagradost.cloudstream3.utils.loadExtractor
 import com.lagradost.cloudstream3.utils.newExtractorLink
 import org.jsoup.nodes.Element
@@ -13,14 +13,14 @@ class DesireMoviesProvider : MainAPI() {
     override var mainUrl = "https://1desiremovies.wales"
     override var name = "DesireMovies"
     override val hasMainPage = true
-    override var lang = "bn"
+    override var lang = "hi"
     override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
 
     override val mainPage = mainPageOf(
         "$mainUrl/page/" to "Latest Movies",
         "$mainUrl/south-movieshindi/page/" to "South Indian",
-        "$mainUrl/bollywood-movies-desiremovie/page/" to "Bollywood"
-        
+        "$mainUrl/bollywood-movies-desiremovie/page/" to "Bollywood",
+        "$mainUrl/web-series/page/" to "Web Series"
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
@@ -42,9 +42,7 @@ class DesireMoviesProvider : MainAPI() {
         val titleElement = selectFirst("h3.entry-title a") ?: return null
         val title = titleElement.text()
         val href = titleElement.attr("href")
-        val posterUrl = selectFirst("figure.mh-loop-thumb img")?.let {
-            it.attr("data-src").ifBlank { it.attr("data-lazy-src") }.ifBlank { it.attr("src") }
-        }
+        val posterUrl = extractImageUrl(this, "figure.mh-loop-thumb img")
 
         return newMovieSearchResponse(title, href, TvType.Movie) {
             this.posterUrl = posterUrl
@@ -54,9 +52,7 @@ class DesireMoviesProvider : MainAPI() {
     override suspend fun load(url: String): LoadResponse {
         val document = app.get(url).document
         val title = document.selectFirst("h1.entry-title")?.text()?.trim() ?: ""
-        val poster = document.selectFirst("div.entry-content img")?.let {
-            it.attr("data-src").ifBlank { it.attr("data-lazy-src") }.ifBlank { it.attr("src") }
-        }
+        val poster = extractImageUrl(document, "div.entry-content img")
         val plot = document.select("div.entry-content p").find { it.text().length > 50 }?.text()
 
         return newMovieLoadResponse(title, url, TvType.Movie, url) {
@@ -76,8 +72,6 @@ class DesireMoviesProvider : MainAPI() {
 
         document.select("div.entry-content a").forEach { entryLink ->
             val gateHref = entryLink.attr("href")
-            // gyanigurus.online একটা লিংক-প্রোটেকশন/গেট পেজ — আসল hubcloud/gdflix
-            // লিংক এর ভেতরে থাকে, article পেজে সরাসরি থাকে না
             if (gateHref.contains("gyanigurus")) {
                 val gateDocument = runCatching { app.get(gateHref).document }.getOrNull()
 
@@ -85,7 +79,6 @@ class DesireMoviesProvider : MainAPI() {
                     val realHref = hostLink.attr("href")
 
                     when {
-                        // hubcloud — কাস্টম এক্সট্রাক্টর দিয়ে (built-in extractor .cx ডোমেইন চেনে না)
                         realHref.contains("hubcloud") -> {
                             runCatching {
                                 val links = HubCloudExtractor().getUrl(realHref, data)
@@ -94,7 +87,6 @@ class DesireMoviesProvider : MainAPI() {
                             }
                         }
 
-                        // gdflix — fallback, Turnstile/JS প্রোটেকশনের কারণে guaranteed কাজ নাও করতে পারে
                         realHref.contains("gdflix") -> {
                             runCatching {
                                 loadExtractor(realHref, data, subtitleCallback, callback)
@@ -109,31 +101,33 @@ class DesireMoviesProvider : MainAPI() {
 }
 
 /**
- * hubcloud.cx-এর জন্য কাস্টম এক্সট্রাক্টর।
- *
- * ফ্লো:
- * 1. hubcloud.cx/drive/{id} পেজ থেকে "Generate Direct Download Link" বাটনের href বের করা
- *    (এটা gamerxyt.com/hubcloud.php?...-এ নিয়ে যায়)
- * 2. সেই পেজে ঠিক Referer হেডার সহ রিকোয়েস্ট পাঠিয়ে (নাহলে bot-protection ভুল পেজ দেখায়)
- *    আসল মিরর লিংকগুলো (FSLv2, FSL, 10Gbps, PixelDrain) বের করা
- * 3. ফাইলের নাম থেকে আসল কোয়ালিটি (480p/720p/1080p/2160p) ডিটেক্ট করা,
- *    যাতে সব লিংকে ভুলভাবে 1080p হার্ডকোড না দেখায়
+ * img ট্যাগ থেকে সঠিক ইমেজ URL বের করে — lazy-loaded ইমেজের জন্য
+ * data-src / data-lazy-src ফলব্যাক সহ।
  */
+private fun extractImageUrl(root: Element, selector: String): String? {
+    val img = root.selectFirst(selector) ?: return null
+
+    val dataSrc = img.attr("data-src")
+    if (dataSrc.isNotBlank()) return dataSrc
+
+    val lazySrc = img.attr("data-lazy-src")
+    if (lazySrc.isNotBlank()) return lazySrc
+
+    val normalSrc = img.attr("src")
+    return normalSrc.ifBlank { null }
+}
+
 class HubCloudExtractor {
     suspend fun getUrl(driveUrl: String, referer: String): List<ExtractorLink> {
         val links = mutableListOf<ExtractorLink>()
 
-        // ধাপ ১: hubcloud.cx/drive/{id} পেজ থেকে জেনারেট বাটনের href বের করা
         val driveDoc = app.get(driveUrl, referer = referer).document
         val generatePageUrl = driveDoc.selectFirst("#download")?.attr("href") ?: return links
 
-        // ফাইলের নাম থেকে আসল কোয়ালিটি বের করা (card-header-এ ফাইলের নাম থাকে)
         val fileName = driveDoc.selectFirst(".card-header")?.text()
             ?: driveDoc.title()
-        val detectedQuality = Qualities.getQualityFromName(fileName).value
+        val detectedQuality = getQualityFromName(fileName).value
 
-        // ধাপ ২: gamerxyt.com/hubcloud.php পেজ থেকে সব মিরর বের করা
-        // এই পেজ Referer চেক করে bot detect করে — তাই hubcloud.cx পেজকেই referer হিসেবে পাঠানো হচ্ছে
         val finalDoc = app.get(generatePageUrl, referer = driveUrl).document
 
         finalDoc.select("a").forEach { el ->

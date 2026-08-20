@@ -17,11 +17,19 @@ apply(plugin = "com.android.library")
 apply(plugin = "kotlin-android")
 apply(plugin = "com.lagradost.cloudstream3.gradle")
 
+// version নম্বরের জন্য integer ব্যবহার করুন
+version = 1
+
 configure<CloudstreamExtension> {
-    // এখানে আপনার অ্যাপের নাম ও প্যাকেজ ঠিক করুন
-    setPluginClass("shimul.com.DesireMoviesPlugin")
-    setPluginName("DesireMovies")
-    setPluginDescription("Download Latest Bollywood, Hollywood and South Movies")
+    description = "Download Latest Bollywood, Hollywood and South Movies"
+    authors = listOf("shimul")
+
+    // 0: Down, 1: Ok, 2: Slow, 3: Beta only
+    status = 1
+
+    tvTypes = listOf("Movie")
+    language = "bn"   // যদি শুধু হিন্দি/বলিউড কনটেন্ট না হয়, "en" দিন
+    iconUrl = "https://www.google.com/s2/favicons?domain=desiremovies.com&sz=%size%"
 }
 
 android {
@@ -52,6 +60,5 @@ repositories {
 }
 
 dependencies {
-    val cloudstreamVersion = "master-SNAPSHOT"
     compileOnly("com.github.recloudstream:cloudstream:master-SNAPSHOT")
 }

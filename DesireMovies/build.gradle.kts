@@ -3,7 +3,7 @@ version = 1
 
 cloudstream {
     description = "DesireMovies"
-    language    = "hi"
+    language    = "bn"
     authors     = listOf("Shimul_Ahmed")
 
     status = 1 // will be 3 if unspecified

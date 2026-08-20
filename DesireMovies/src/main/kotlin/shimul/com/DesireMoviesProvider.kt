@@ -43,24 +43,23 @@ class DesireMoviesProvider : MainAPI() {
         val titleElement = selectFirst("h3.entry-title a") ?: return null
         val title = titleElement.text()
         val href = titleElement.attr("href")
-        val posterUrl = selectFirst("figure.mh-loop-thumb img")?.attr("src")
-
-        return newMovieSearchResponse(title, href, TvType.Movie) {
-            this.posterUrl = posterUrl
-        }
-    }
+        val posterUrl = selectFirst("figure.mh-loop-thumb img")?.let {
+    it.attr("data-src").ifBlank { it.attr("data-lazy-src") }.ifBlank { it.attr("src") }
+}
 
     override suspend fun load(url: String): LoadResponse {
-        val document = app.get(url).document
-        val title = document.selectFirst("h1.entry-title")?.text()?.trim() ?: ""
-        val poster = document.selectFirst("div.entry-content img")?.attr("src")
-        val plot = document.select("div.entry-content p").find { it.text().length > 50 }?.text()
-
-        return newMovieLoadResponse(title, url, TvType.Movie, url) {
-            this.posterUrl = poster
-            this.plot = plot
-        }
+    val document = app.get(url).document
+    val title = document.selectFirst("h1.entry-title")?.text()?.trim() ?: ""
+    val poster = document.selectFirst("div.entry-content img")?.let {
+        it.attr("data-src").ifBlank { it.attr("data-lazy-src") }.ifBlank { it.attr("src") }
     }
+    val plot = document.select("div.entry-content p").find { it.text().length > 50 }?.text()
+
+    return newMovieLoadResponse(title, url, TvType.Movie, url) {
+        this.posterUrl = poster
+        this.plot = plot
+    }
+}
 
     override suspend fun loadLinks(
         data: String,

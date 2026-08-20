@@ -2,15 +2,19 @@ package shimul.com
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.SubtitleFile
+import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.ExtractorLink
+import com.lagradost.cloudstream3.utils.ExtractorLinkType
+import com.lagradost.cloudstream3.utils.Qualities
 import com.lagradost.cloudstream3.utils.loadExtractor
+import com.lagradost.cloudstream3.utils.newExtractorLink
 import org.jsoup.nodes.Element
 
 class DesireMoviesProvider : MainAPI() {
     override var mainUrl = "https://1desiremovies.wales"
     override var name = "DesireMovies"
     override val hasMainPage = true
-    override var lang = "bn"
+    override var lang = "hi"
     override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
 
     override val mainPage = mainPageOf(
@@ -69,22 +73,122 @@ class DesireMoviesProvider : MainAPI() {
 
         document.select("div.entry-content a").forEach { entryLink ->
             val gateHref = entryLink.attr("href")
-            // gyanigurus.online একটা লিংক-প্রোটেকশন/গেট পেজ — আসল hubcloud/gdflix লিংক এর ভেতরে থাকে,
-            // article পেজে সরাসরি থাকে না
+            // gyanigurus.online একটা লিংক-প্রোটেকশন/গেট পেজ — আসল hubcloud/gdflix
+            // লিংক এর ভেতরে থাকে, article পেজে সরাসরি থাকে না
             if (gateHref.contains("gyanigurus")) {
                 val gateDocument = runCatching { app.get(gateHref).document }.getOrNull()
+
                 gateDocument?.select("a")?.forEach { hostLink ->
                     val realHref = hostLink.attr("href")
-                    if (realHref.contains("hubcloud") || realHref.contains("gdflix") ||
-                        realHref.contains("hubdrive") || realHref.contains("multicloudlinks") ||
-                        realHref.contains("drive")
-                    ) {
-                        loadExtractor(realHref, data, subtitleCallback, callback)
-                        found = true
+
+                    when {
+                        // hubcloud — কাস্টম এক্সট্রাক্টর দিয়ে (built-in extractor .cx ডোমেইন চেনে না)
+                        realHref.contains("hubcloud") -> {
+                            runCatching {
+                                val links = HubCloudExtractor().getUrl(realHref, data)
+                                links.forEach { callback(it) }
+                                if (links.isNotEmpty()) found = true
+                            }
+                        }
+
+                        // gdflix — fallback, Turnstile/JS প্রোটেকশনের কারণে guaranteed কাজ নাও করতে পারে
+                        realHref.contains("gdflix") -> {
+                            runCatching {
+                                loadExtractor(realHref, data, subtitleCallback, callback)
+                            }.onSuccess { found = true }
+                        }
                     }
                 }
             }
         }
         return found
+    }
+}
+
+/**
+ * hubcloud.cx-এর জন্য কাস্টম এক্সট্রাক্টর।
+ *
+ * ফ্লো:
+ * 1. hubcloud.cx/drive/{id} পেজ থেকে "Generate Direct Download Link" বাটনের href বের করা
+ *    (এটা gamerxyt.com/hubcloud.php?...-এ নিয়ে যায়)
+ * 2. সেই পেজে ঠিক Referer হেডার সহ রিকোয়েস্ট পাঠিয়ে (নাহলে bot-protection ভুল পেজ দেখায়)
+ *    আসল মিরর লিংকগুলো (FSLv2, FSL, 10Gbps, PixelDrain) বের করা
+ */
+class HubCloudExtractor {
+    suspend fun getUrl(driveUrl: String, referer: String): List<ExtractorLink> {
+        val links = mutableListOf<ExtractorLink>()
+
+        // ধাপ ১: hubcloud.cx/drive/{id} পেজ থেকে জেনারেট বাটনের href বের করা
+        val driveDoc = app.get(driveUrl, referer = referer).document
+        val generatePageUrl = driveDoc.selectFirst("#download")?.attr("href") ?: return links
+
+        // ধাপ ২: gamerxyt.com/hubcloud.php পেজ থেকে সব মিরর বের করা
+        // এই পেজ Referer চেক করে bot detect করে — তাই hubcloud.cx পেজকেই referer হিসেবে পাঠানো হচ্ছে
+        val finalDoc = app.get(generatePageUrl, referer = driveUrl).document
+
+        finalDoc.select("a").forEach { el ->
+            val href = el.attr("href")
+            val text = el.text()
+
+            when {
+                href.contains("bunker.monster") || text.contains("FSLv2", ignoreCase = true) -> {
+                    links.add(
+                        newExtractorLink(
+                            source = "DesireMovies",
+                            name = "HubCloud [FSLv2]",
+                            url = href,
+                            type = ExtractorLinkType.VIDEO
+                        ) {
+                            this.referer = generatePageUrl
+                            this.quality = Qualities.P1080.value
+                        }
+                    )
+                }
+
+                href.contains("cloudflarestorage.com") || text.contains("FSL Server", ignoreCase = true) -> {
+                    links.add(
+                        newExtractorLink(
+                            source = "DesireMovies",
+                            name = "HubCloud [FSL]",
+                            url = href,
+                            type = ExtractorLinkType.VIDEO
+                        ) {
+                            this.referer = generatePageUrl
+                            this.quality = Qualities.P1080.value
+                        }
+                    )
+                }
+
+                href.contains("pixel.hubcloud") || text.contains("10Gbps", ignoreCase = true) -> {
+                    links.add(
+                        newExtractorLink(
+                            source = "DesireMovies",
+                            name = "HubCloud [10Gbps]",
+                            url = href,
+                            type = ExtractorLinkType.VIDEO
+                        ) {
+                            this.referer = generatePageUrl
+                            this.quality = Qualities.P1080.value
+                        }
+                    )
+                }
+
+                href.contains("pixeldrain") -> {
+                    links.add(
+                        newExtractorLink(
+                            source = "DesireMovies",
+                            name = "HubCloud [PixelDrain]",
+                            url = href,
+                            type = ExtractorLinkType.VIDEO
+                        ) {
+                            this.referer = generatePageUrl
+                            this.quality = Qualities.P1080.value
+                        }
+                    )
+                }
+            }
+        }
+
+        return links
     }
 }

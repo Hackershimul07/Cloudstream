@@ -13,14 +13,14 @@ class DesireMoviesProvider : MainAPI() {
     override var mainUrl = "https://1desiremovies.wales"
     override var name = "DesireMovies"
     override val hasMainPage = true
-    override var lang = "hi"
+    override var lang = "bn"
     override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
 
     override val mainPage = mainPageOf(
         "$mainUrl/page/" to "Latest Movies",
         "$mainUrl/south-movieshindi/page/" to "South Indian",
-        "$mainUrl/bollywood-movies-desiremovie/page/" to "Bollywood",
-        "$mainUrl/web-series/page/" to "Web Series"
+        "$mainUrl/bollywood-movies-desiremovie/page/" to "Bollywood"
+        
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {

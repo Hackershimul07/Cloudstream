@@ -2,6 +2,7 @@ package shimul.com
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.ExtractorLink
+import com.lagradost.cloudstream3.utils.SubtitleFile
 import com.lagradost.cloudstream3.utils.loadExtractor
 import org.jsoup.nodes.Element
 
@@ -9,7 +10,7 @@ class DesireMoviesProvider : MainAPI() {
     override var mainUrl = "https://1desiremovies.wales"
     override var name = "DesireMovies"
     override val hasMainPage = true
-    override var lang = "bn"
+    override var lang = "hi"
     override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
 
     override val mainPage = mainPageOf(
@@ -59,17 +60,31 @@ class DesireMoviesProvider : MainAPI() {
 
     override suspend fun loadLinks(
         data: String,
-        isDataJob: Boolean,
+        isCasting: Boolean,
+        subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         val document = app.get(data).document
-        document.select("div.entry-content a").forEach { 
-            val link = it.attr("href")
-            // HubCloud বা GDFlix এর মতো ড্রাইভ লিঙ্কগুলো অটোমেটিক হ্যান্ডেল করবে
-            if (link.contains("hubcloud") || link.contains("gdflix") || link.contains("drive")) {
-                loadExtractor(link, data, callback)
+        var found = false
+
+        document.select("div.entry-content a").forEach { entryLink ->
+            val gateHref = entryLink.attr("href")
+            // gyanigurus.online একটা লিংক-প্রোটেকশন/গেট পেজ — আসল hubcloud/gdflix লিংক এর ভেতরে থাকে,
+            // article পেজে সরাসরি থাকে না
+            if (gateHref.contains("gyanigurus")) {
+                val gateDocument = runCatching { app.get(gateHref).document }.getOrNull()
+                gateDocument?.select("a")?.forEach { hostLink ->
+                    val realHref = hostLink.attr("href")
+                    if (realHref.contains("hubcloud") || realHref.contains("gdflix") ||
+                        realHref.contains("hubdrive") || realHref.contains("multicloudlinks") ||
+                        realHref.contains("drive")
+                    ) {
+                        loadExtractor(realHref, data, subtitleCallback, callback)
+                        found = true
+                    }
+                }
             }
         }
-        return true
+        return found
     }
 }

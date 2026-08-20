@@ -2,7 +2,6 @@ package shimul.com
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.SubtitleFile
-import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import com.lagradost.cloudstream3.utils.Qualities
@@ -14,14 +13,14 @@ class DesireMoviesProvider : MainAPI() {
     override var mainUrl = "https://1desiremovies.wales"
     override var name = "DesireMovies"
     override val hasMainPage = true
-    override var lang = "bn"
+    override var lang = "hi"
     override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
 
     override val mainPage = mainPageOf(
         "$mainUrl/page/" to "Latest Movies",
         "$mainUrl/south-movieshindi/page/" to "South Indian",
-        "$mainUrl/bollywood-movies-desiremovie/page/" to "Bollywood"
-        
+        "$mainUrl/bollywood-movies-desiremovie/page/" to "Bollywood",
+        "$mainUrl/web-series/page/" to "Web Series"
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
@@ -44,22 +43,27 @@ class DesireMoviesProvider : MainAPI() {
         val title = titleElement.text()
         val href = titleElement.attr("href")
         val posterUrl = selectFirst("figure.mh-loop-thumb img")?.let {
-    it.attr("data-src").ifBlank { it.attr("data-lazy-src") }.ifBlank { it.attr("src") }
-}
+            it.attr("data-src").ifBlank { it.attr("data-lazy-src") }.ifBlank { it.attr("src") }
+        }
+
+        return newMovieSearchResponse(title, href, TvType.Movie) {
+            this.posterUrl = posterUrl
+        }
+    }
 
     override suspend fun load(url: String): LoadResponse {
-    val document = app.get(url).document
-    val title = document.selectFirst("h1.entry-title")?.text()?.trim() ?: ""
-    val poster = document.selectFirst("div.entry-content img")?.let {
-        it.attr("data-src").ifBlank { it.attr("data-lazy-src") }.ifBlank { it.attr("src") }
-    }
-    val plot = document.select("div.entry-content p").find { it.text().length > 50 }?.text()
+        val document = app.get(url).document
+        val title = document.selectFirst("h1.entry-title")?.text()?.trim() ?: ""
+        val poster = document.selectFirst("div.entry-content img")?.let {
+            it.attr("data-src").ifBlank { it.attr("data-lazy-src") }.ifBlank { it.attr("src") }
+        }
+        val plot = document.select("div.entry-content p").find { it.text().length > 50 }?.text()
 
-    return newMovieLoadResponse(title, url, TvType.Movie, url) {
-        this.posterUrl = poster
-        this.plot = plot
+        return newMovieLoadResponse(title, url, TvType.Movie, url) {
+            this.posterUrl = poster
+            this.plot = plot
+        }
     }
-}
 
     override suspend fun loadLinks(
         data: String,
@@ -112,19 +116,24 @@ class DesireMoviesProvider : MainAPI() {
  *    (এটা gamerxyt.com/hubcloud.php?...-এ নিয়ে যায়)
  * 2. সেই পেজে ঠিক Referer হেডার সহ রিকোয়েস্ট পাঠিয়ে (নাহলে bot-protection ভুল পেজ দেখায়)
  *    আসল মিরর লিংকগুলো (FSLv2, FSL, 10Gbps, PixelDrain) বের করা
+ * 3. ফাইলের নাম থেকে আসল কোয়ালিটি (480p/720p/1080p/2160p) ডিটেক্ট করা,
+ *    যাতে সব লিংকে ভুলভাবে 1080p হার্ডকোড না দেখায়
  */
 class HubCloudExtractor {
     suspend fun getUrl(driveUrl: String, referer: String): List<ExtractorLink> {
         val links = mutableListOf<ExtractorLink>()
 
+        // ধাপ ১: hubcloud.cx/drive/{id} পেজ থেকে জেনারেট বাটনের href বের করা
         val driveDoc = app.get(driveUrl, referer = referer).document
         val generatePageUrl = driveDoc.selectFirst("#download")?.attr("href") ?: return links
 
-        // ফাইলের নাম থেকে আসল কোয়ালিটি বের করা (card-header-এ থাকে)
+        // ফাইলের নাম থেকে আসল কোয়ালিটি বের করা (card-header-এ ফাইলের নাম থাকে)
         val fileName = driveDoc.selectFirst(".card-header")?.text()
             ?: driveDoc.title()
         val detectedQuality = Qualities.getQualityFromName(fileName).value
 
+        // ধাপ ২: gamerxyt.com/hubcloud.php পেজ থেকে সব মিরর বের করা
+        // এই পেজ Referer চেক করে bot detect করে — তাই hubcloud.cx পেজকেই referer হিসেবে পাঠানো হচ্ছে
         val finalDoc = app.get(generatePageUrl, referer = driveUrl).document
 
         finalDoc.select("a").forEach { el ->

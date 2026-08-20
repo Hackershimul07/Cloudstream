@@ -8,7 +8,7 @@ buildscript {
         maven("https://jitpack.io")
     }
     dependencies {
-        classpath("com.android.tools.build:gradle:8.7.3")   // ← এই লাইনটা নতুন যোগ করুন
+        classpath("com.android.tools.build:gradle:8.7.3")
         classpath("com.github.recloudstream:gradle:master-SNAPSHOT")
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.20")
     }
@@ -30,7 +30,7 @@ configure<CloudstreamExtension> {
 
     tvTypes = listOf("Movie")
     language = "bn"   // যদি শুধু হিন্দি/বলিউড কনটেন্ট না হয়, "en" দিন
-    iconUrl = "https://www.google.com/s2/favicons?domain=desiremovies.com&sz=%size%"
+    iconUrl = "https://1desiremovies.wales/wp-content/uploads/2023/04/cropped-image_processing20210911-26622-fplmvm-192x192.png"
 }
 
 android {

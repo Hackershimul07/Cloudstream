@@ -33,32 +33,24 @@ class DesireMoviesProvider : MainAPI() {
     // =========================
 
     override suspend fun getMainPage(
-        page: Int,
-        request: MainPageRequest
-    ): HomePageResponse {
+    page: Int,
+    request: MainPageRequest
+): HomePageResponse {
 
-        val url = if (page <= 1) {
-            request.data
-        } else {
-            "${request.data}$page/"
-        }
+    val document = app.get(
+        request.data + if (page == 1) "" else "$page/"
+    ).document
 
-        val document = app.get(url).document
+    val home = document
+        .select("article.mh-loop-item")
+        .mapNotNull { it.toSearchResult() }
 
-        val home = document
-            .select(
-                "article.mh-loop-item, " +
-                "article, " +
-                ".mh-loop-item"
-            )
-            .mapNotNull { it.toSearchResult() }
-
-        return newHomePageResponse(
-            request.name,
-            home,
-            hasNext = home.isNotEmpty()
-        )
-    }
+    return newHomePageResponse(
+        request.name,
+        home,
+        hasNext = home.isNotEmpty()
+    )
+}
 
     // =========================
     // SEARCH
@@ -66,28 +58,15 @@ class DesireMoviesProvider : MainAPI() {
 
     override suspend fun search(query: String): List<SearchResponse> {
 
-        val encodedQuery = URLEncoder
-            .encode(query.trim(), "UTF-8")
+    val document = app.get(
+        "$mainUrl/?s=${query.trim().replace(" ", "+")}"
+    ).document
 
-        val searchUrl = "$mainUrl/?s=$encodedQuery"
-
-        val document = app.get(
-            searchUrl,
-            headers = mapOf(
-                "User-Agent" to USER_AGENT
-            )
-        ).document
-
-        return document
-            .select(
-                "article.mh-loop-item, " +
-                "article, " +
-                ".mh-loop-item, " +
-                ".post"
-            )
-            .mapNotNull { it.toSearchResult() }
-            .distinctBy { it.url }
-    }
+    return document
+        .select("article.mh-loop-item")
+        .mapNotNull { it.toSearchResult() }
+        .distinctBy { it.url }
+}
 
     // =========================
     // SEARCH RESULT PARSER
@@ -95,53 +74,39 @@ class DesireMoviesProvider : MainAPI() {
 
     private fun Element.toSearchResult(): SearchResponse? {
 
-        val titleElement = selectFirst(
-            "h3.entry-title a, " +
-            "h2.entry-title a, " +
-            "h1.entry-title a, " +
-            ".entry-title a, " +
-            "a[href]"
-        ) ?: return null
+    // Movie title
+    val titleElement = selectFirst(
+        "h3.entry-title a",
+        "h2.entry-title a",
+        ".entry-title a"
+    ) ?: return null
 
-        val title = titleElement
-            .text()
-            .trim()
+    val title = titleElement.text().trim()
 
-        if (title.isBlank()) return null
+    if (title.isBlank()) return null
 
-        val href = titleElement
-            .absUrl("href")
-            .ifBlank {
-                titleElement.attr("href")
-            }
-
-        if (href.isBlank()) return null
-
-        // Search result-এর ভিতরের unwanted links বাদ দেওয়ার চেষ্টা
-        if (
-            href.startsWith("#") ||
-            href.startsWith("javascript:")
-        ) {
-            return null
-        }
-
-        val posterUrl = extractImageUrl(
-            this,
-            "figure.mh-loop-thumb img, " +
-            ".mh-loop-thumb img, " +
-            ".post-thumbnail img, " +
-            ".entry-thumbnail img, " +
-            "img"
-        )
-
-        return newMovieSearchResponse(
-            title,
-            href,
-            TvType.Movie
-        ) {
-            this.posterUrl = posterUrl
-        }
+    val href = titleElement.absUrl("href").ifBlank {
+        titleElement.attr("href")
     }
+
+    if (href.isBlank()) return null
+
+    val posterUrl = extractImageUrl(
+        this,
+        ".mh-loop-thumb img",
+        ".mh-loop-thumb a img",
+        ".entry-thumbnail img",
+        "img"
+    )
+
+    return newMovieSearchResponse(
+        title,
+        href,
+        TvType.Movie
+    ) {
+        this.posterUrl = posterUrl
+    }
+}
 
     // =========================
     // LOAD
@@ -523,32 +488,26 @@ class HubCloudExtractor {
 
 private fun extractImageUrl(
     root: Element,
-    selector: String
+    vararg selectors: String
 ): String? {
 
-    val img = root.selectFirst(selector)
-        ?: return null
+    for (selector in selectors) {
 
-    // meta[property=og:image]
-    if (img.tagName() == "meta") {
-        return img.attr("content")
-            .takeIf { it.isNotBlank() }
-    }
+        val img = root.selectFirst(selector) ?: continue
 
-    val attributes = listOf(
-        "data-src",
-        "data-lazy-src",
-        "data-original",
-        "data-url",
-        "src"
-    )
+        val url = listOf(
+            img.attr("data-src"),
+            img.attr("data-lazy-src"),
+            img.attr("data-original"),
+            img.attr("src")
+        ).firstOrNull { it.isNotBlank() }
 
-    for (attribute in attributes) {
-
-        val value = img.attr(attribute)
-
-        if (value.isNotBlank()) {
-            return value
+        if (!url.isNullOrBlank()) {
+            return if (url.startsWith("http")) {
+                url
+            } else {
+                mainUrl + "/" + url.trimStart('/')
+            }
         }
     }
 

@@ -1,4 +1,3 @@
-// use an integer for version numbers
 version = 7
 
 cloudstream {
@@ -6,7 +5,7 @@ cloudstream {
     language    = "bn"
     authors     = listOf("Shimul_Ahmed")
 
-    status = 1 // will be 3 if unspecified
+    status = 1 
 
     tvTypes = listOf("Movie", "TvSeries")
 

@@ -7,7 +7,6 @@ import com.lagradost.cloudstream3.utils.getQualityFromName
 import com.lagradost.cloudstream3.utils.loadExtractor
 import com.lagradost.cloudstream3.utils.newExtractorLink
 import org.jsoup.nodes.Element
-import org.json.JSONArray
 import java.net.URLEncoder
 
 class DesireMoviesProvider : MainAPI() {
@@ -73,47 +72,42 @@ class DesireMoviesProvider : MainAPI() {
     // SEARCH
     // =========================
 
+    // FIX: Previously this used the WordPress REST API route
+    // (/wp-json/wp/v2/search) because of a wrong assumption that the
+    // normal "?s=" search URL always returned the SAME cached homepage
+    // HTML regardless of the query (LiteSpeed full-page cache).
+    //
+    // That assumption was WRONG — confirmed by manually checking
+    // "https://1desiremovies.nexus/search/Toxic/" (which the theme
+    // internally treats the same as "?s=Toxic"): it returns real,
+    // query-specific results (Toxic (2026), The Toxic Avenger,
+    // Toxic Town, etc). LiteSpeed does NOT cache search result pages
+    // by default (it excludes ?s= / search pages from full-page cache),
+    // so this was the actual bug — not the wp-json endpoint choice.
+    //
+    // Root cause of "search kaj korche na": the wp-json REST search
+    // route is blocked/disabled on this site (likely by security /
+    // anti-bot rules), so it silently returned nothing and search()
+    // fell through to emptyList() every time.
+    //
+    // FIX: switched back to plain "?s=" HTML search, parsed with the
+    // same "article.mh-loop-item" selector already used on the main
+    // page — this is confirmed working and needs no JSON parsing.
     override suspend fun search(query: String): List<SearchResponse> {
 
-        // FIX: the site's ordinary "?s=" search URL is served through
-        // LiteSpeed Cache's full-page cache, which returns the SAME
-        // cached homepage HTML no matter what the query is (confirmed
-        // by testing several different queries — all returned identical
-        // content). So real search results never come back that way,
-        // and the request may also get blocked outright by anti-bot
-        // protection since it had no User-Agent header.
-        //
-        // WordPress exposes a separate REST API search route
-        // (/wp-json/wp/v2/search) that is not part of that page cache,
-        // so we use that instead and parse its JSON response directly.
         val encodedQuery = URLEncoder.encode(query.trim(), "UTF-8")
 
-        val response = runCatching {
+        val document = runCatching {
             app.get(
-                "$mainUrl/wp-json/wp/v2/search?search=$encodedQuery&per_page=30&subtype=post",
+                "$mainUrl/?s=$encodedQuery",
                 headers = mapOf("User-Agent" to USER_AGENT)
-            ).text
+            ).document
         }.getOrNull() ?: return emptyList()
 
-        val results = mutableListOf<SearchResponse>()
-
-        runCatching {
-            val jsonArray = JSONArray(response)
-            for (i in 0 until jsonArray.length()) {
-                val item = jsonArray.getJSONObject(i)
-
-                val title = item.optString("title").trim()
-                val url = item.optString("url").trim()
-
-                if (title.isBlank() || url.isBlank()) continue
-
-                results.add(
-                    newMovieSearchResponse(title, url, TvType.Movie)
-                )
-            }
-        }
-
-        return results.distinctBy { it.url }
+        return document
+            .select("article.mh-loop-item")
+            .mapNotNull { it.toSearchResult() }
+            .distinctBy { it.url }
     }
 
     // =========================

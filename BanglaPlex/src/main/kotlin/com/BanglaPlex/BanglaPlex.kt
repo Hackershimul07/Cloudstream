@@ -20,8 +20,8 @@ class Banglaplex : MainAPI() {
         "genre/hollywood-movies" to "Hollywood",
         "genre/south-indian-movies" to "South Indian Movies",
         "genre/bollywood-series" to "Bollywood Series",
-        "genre/dual-audio-movies" to "Dual Audio Movies",
-        "genre/korean-web-series" to "Korean Web Series",
+        
+        
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse? {

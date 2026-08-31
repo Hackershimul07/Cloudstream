@@ -65,21 +65,12 @@ open class Cinefreak : MainAPI() {
         "animation" to "Animation",
         "bangla-movies" to "Bangla Movies",
         "bangla-dubbed" to "Bangla Dubbed",
-        "chinese" to "Chinese",
-        "dual-audio" to "Dual Audio",
-        "english-movies" to "English Movies",
+        
+        
+        
         "hindi-movies" to "Hindi Movies",
         "hindi-dubbed-movies" to "Hindi Dubbed Movies",
-        "japanese" to "Japanese",
-        "k-drama" to "K-Drama",
-        "korean" to "Korean",
-        "kannada" to "Kannada",
-        "telugu" to "Telugu",
-        "tamil" to "Tamil",
-        "malayalam" to "Malayalam",
-        "indonesian" to "Indonesian",
-        "others" to "Others",
-        "spanish" to "Spanish",
+        
     )
     private val headers = mapOf("User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0","Cookie" to "xla=s4t")
 

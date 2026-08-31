@@ -33,24 +33,24 @@ class DesireMoviesProvider : MainAPI() {
     // =========================
 
     override suspend fun getMainPage(
-    page: Int,
-    request: MainPageRequest
-): HomePageResponse {
+        page: Int,
+        request: MainPageRequest
+    ): HomePageResponse {
 
-    val document = app.get(
-        request.data + if (page == 1) "" else "$page/"
-    ).document
+        val document = app.get(
+            request.data + if (page == 1) "" else "$page/"
+        ).document
 
-    val home = document
-        .select("article.mh-loop-item")
-        .mapNotNull { it.toSearchResult() }
+        val home = document
+            .select("article.mh-loop-item")
+            .mapNotNull { it.toSearchResult() }
 
-    return newHomePageResponse(
-        request.name,
-        home,
-        hasNext = home.isNotEmpty()
-    )
-}
+        return newHomePageResponse(
+            request.name,
+            home,
+            hasNext = home.isNotEmpty()
+        )
+    }
 
     // =========================
     // SEARCH
@@ -58,15 +58,15 @@ class DesireMoviesProvider : MainAPI() {
 
     override suspend fun search(query: String): List<SearchResponse> {
 
-    val document = app.get(
-        "$mainUrl/?s=${query.trim().replace(" ", "+")}"
-    ).document
+        val document = app.get(
+            "$mainUrl/?s=${query.trim().replace(" ", "+")}"
+        ).document
 
-    return document
-        .select("article.mh-loop-item")
-        .mapNotNull { it.toSearchResult() }
-        .distinctBy { it.url }
-}
+        return document
+            .select("article.mh-loop-item")
+            .mapNotNull { it.toSearchResult() }
+            .distinctBy { it.url }
+    }
 
     // =========================
     // SEARCH RESULT PARSER
@@ -74,39 +74,39 @@ class DesireMoviesProvider : MainAPI() {
 
     private fun Element.toSearchResult(): SearchResponse? {
 
-    // Movie title
-    val titleElement = selectFirst(
-        "h3.entry-title a",
-        "h2.entry-title a",
-        ".entry-title a"
-    ) ?: return null
+        // Movie title
+        // FIX: selectFirst() takes ONE CSS selector string.
+        // Multiple selectors must be comma-joined *inside* the same string.
+        val titleElement = selectFirst(
+            "h3.entry-title a, h2.entry-title a, .entry-title a"
+        ) ?: return null
 
-    val title = titleElement.text().trim()
+        val title = titleElement.text().trim()
 
-    if (title.isBlank()) return null
+        if (title.isBlank()) return null
 
-    val href = titleElement.absUrl("href").ifBlank {
-        titleElement.attr("href")
+        val href = titleElement.absUrl("href").ifBlank {
+            titleElement.attr("href")
+        }
+
+        if (href.isBlank()) return null
+
+        // FIX: extractImageUrl now needs mainUrl passed in explicitly,
+        // since it's a top-level function and can't see the class property.
+        val posterUrl = extractImageUrl(
+            this,
+            mainUrl,
+            ".mh-loop-thumb img, .mh-loop-thumb a img, .entry-thumbnail img, img"
+        )
+
+        return newMovieSearchResponse(
+            title,
+            href,
+            TvType.Movie
+        ) {
+            this.posterUrl = posterUrl
+        }
     }
-
-    if (href.isBlank()) return null
-
-    val posterUrl = extractImageUrl(
-        this,
-        ".mh-loop-thumb img",
-        ".mh-loop-thumb a img",
-        ".entry-thumbnail img",
-        "img"
-    )
-
-    return newMovieSearchResponse(
-        title,
-        href,
-        TvType.Movie
-    ) {
-        this.posterUrl = posterUrl
-    }
-}
 
     // =========================
     // LOAD
@@ -123,9 +123,7 @@ class DesireMoviesProvider : MainAPI() {
 
         val title = document
             .selectFirst(
-                "h1.entry-title, " +
-                "h1.post-title, " +
-                ".entry-title"
+                "h1.entry-title, h1.post-title, .entry-title"
             )
             ?.text()
             ?.trim()
@@ -133,17 +131,13 @@ class DesireMoviesProvider : MainAPI() {
 
         val poster = extractImageUrl(
             document,
-            "div.entry-content img, " +
-            ".entry-content img, " +
-            ".post-content img, " +
-            "meta[property=og:image]"
+            mainUrl,
+            "div.entry-content img, .entry-content img, .post-content img, meta[property=og:image]"
         )
 
         val plot = document
             .select(
-                "div.entry-content p, " +
-                ".entry-content p, " +
-                ".post-content p"
+                "div.entry-content p, .entry-content p, .post-content p"
             )
             .map { it.text().trim() }
             .firstOrNull { it.length > 50 }
@@ -180,9 +174,7 @@ class DesireMoviesProvider : MainAPI() {
         var found = false
 
         val entryLinks = document.select(
-            "div.entry-content a[href], " +
-            ".entry-content a[href], " +
-            ".post-content a[href]"
+            "div.entry-content a[href], .entry-content a[href], .post-content a[href]"
         )
 
         for (entryLink in entryLinks) {
@@ -484,10 +476,14 @@ class HubCloudExtractor {
 
 // ======================================================
 // IMAGE URL
+// FIX: mainUrl/baseUrl is now a parameter instead of an
+// implicit reference to the class property, since this is
+// a top-level function outside DesireMoviesProvider.
 // ======================================================
 
 private fun extractImageUrl(
     root: Element,
+    baseUrl: String,
     vararg selectors: String
 ): String? {
 
@@ -506,7 +502,7 @@ private fun extractImageUrl(
             return if (url.startsWith("http")) {
                 url
             } else {
-                mainUrl + "/" + url.trimStart('/')
+                baseUrl + "/" + url.trimStart('/')
             }
         }
     }

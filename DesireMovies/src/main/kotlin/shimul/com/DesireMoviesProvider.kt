@@ -11,6 +11,8 @@ import java.net.URLEncoder
 
 class DesireMoviesProvider : MainAPI() {
 
+    // FIX: mainUrl must include the scheme (https://), otherwise
+    // app.get() requests can fail or misbehave.
     override var mainUrl = "https://1desiremovies.nexus"
     override var name = "DesireMovies"
     override var lang = "bn"
@@ -22,10 +24,15 @@ class DesireMoviesProvider : MainAPI() {
         TvType.TvSeries
     )
 
+    // FIX: URLs no longer hardcode "/page/" — WordPress sites serve
+    // page 1 at the plain category URL (e.g. "mainUrl/") and only
+    // use "/page/N/" starting from page 2. The old code always
+    // requested ".../page/" on page 1, which is an invalid/404 URL
+    // on this site, so every section loaded an empty list.
     override val mainPage = mainPageOf(
-        "$mainUrl/page/" to "Latest Movies",
-        "$mainUrl/south-movieshindi/page/" to "South Indian",
-        "$mainUrl/bollywood-movies-desiremovie/page/" to "Bollywood"
+        "$mainUrl/" to "Latest Movies",
+        "$mainUrl/south-movieshindi/" to "South Indian",
+        "$mainUrl/bollywood-movies-desiremovie/" to "Bollywood"
     )
 
     // =========================
@@ -37,9 +44,15 @@ class DesireMoviesProvider : MainAPI() {
         request: MainPageRequest
     ): HomePageResponse {
 
-        val document = app.get(
-            request.data + if (page == 1) "" else "$page/"
-        ).document
+        // FIX: page 1 -> request.data as-is (e.g. "mainUrl/south-movieshindi/")
+        //      page N -> request.data + "page/N/" (e.g. ".../page/2/")
+        val url = if (page == 1) {
+            request.data
+        } else {
+            "${request.data}page/$page/"
+        }
+
+        val document = app.get(url).document
 
         val home = document
             .select("article.mh-loop-item")

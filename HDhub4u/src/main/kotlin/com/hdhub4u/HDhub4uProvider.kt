@@ -63,7 +63,7 @@ class HDhub4uProvider : MainAPI() {
         "category/hindi-dubbed/" to "Hindi Dubbed",
         "category/south-hindi-movies/" to "South Hindi Dubbed",
         "category/category/web-series/" to "Web Series",
-        "category/adult/" to "Adult",
+        
     )
     private val headers = mapOf("User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0","Cookie" to "xla=s4t")
 

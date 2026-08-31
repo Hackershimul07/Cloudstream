@@ -239,36 +239,19 @@ class MovieBoxProvider(private val sharedPref: SharedPreferences? = null) : Main
         "8019599703232971616" to "Hollywood",
         "4741626294545400336" to "Top Series This Week",
         "8434602210994128512" to "Anime",
-        "1255898847918934600" to "Reality TV",
+        
         "4903182713986896328" to "Indian Drama",
-        "7878715743607948784" to "Korean Drama",
-        "8788126208987989488" to "Chinese Drama",
-        "3910636007619709856" to "Western TV",
-        "5177200225164885656" to "Turkish Drama",
+        
+        
+        
+        
         "1|1" to "Movies",
         "1|2" to "Series",
         "1|1006" to "Anime",
         "1|1;country=India" to "Indian (Movies)",
         "1|2;country=India" to "Indian (Series)",
-        "1|1;classify=Hindi dub;country=United States" to "USA (Movies)",
-        "1|2;classify=Hindi dub;country=United States" to "USA (Series)",
-        "1|1;country=Japan" to "Japan (Movies)",
-        "1|2;country=Japan" to "Japan (Series)",
-        "1|1;country=China" to "China (Movies)",
-        "1|2;country=China" to "China (Series)",
-        "1|1;country=Philippines" to "Philippines (Movies)",
-        "1|2;country=Philippines" to "Philippines (Series)",
-        "1|1;country=Thailand" to "Thailand(Movies)",
-        "1|2;country=Thailand" to "Thailand(Series)",
-        "1|1;country=Nigeria" to "Nollywood (Movies)",
-        "1|2;country=Nigeria" to "Nollywood (Series)",
-        "1|1;country=Korea" to "South Korean (Movies)",
-        "1|2;country=Korea" to "South Korean (Series)",
-        "1|1;classify=Hindi dub;genre=Action" to "Action (Movies)",
-        "1|1;classify=Hindi dub;genre=Crime" to "Crime (Movies)",
-        "1|1;classify=Hindi dub;genre=Comedy" to "Comedy (Movies)",
-        "1|2;classify=Hindi dub;genre=Crime" to "Crime (Series)",
-        "1|2;classify=Hindi dub;genre=Comedy" to "Comedy (Series)",
+        
+        
         )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {

@@ -9,10 +9,10 @@ import java.net.URLEncoder
 class MovieLinkBDProvider : MainAPI() {
     companion object {
         var appContext: Context? = null
-        private const val FALLBACK_URL = "dxhdjd.movielinkbd.li"
+        private const val FALLBACK_URL = "https://dxhdjd.movielinkbd.li"
     }
 
-    override var mainUrl = "dxhdjd.movielinkbd.li"
+    override var mainUrl = "https://dxhdjd.movielinkbd.li"
     override var name = "MovieLinkBD"
     override var lang = "bn"
     override val hasMainPage = true

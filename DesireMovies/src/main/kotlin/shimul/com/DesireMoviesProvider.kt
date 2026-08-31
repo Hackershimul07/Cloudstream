@@ -11,7 +11,7 @@ import java.net.URLEncoder
 
 class DesireMoviesProvider : MainAPI() {
 
-    override var mainUrl = "https://1desiremovies.wales"
+    override var mainUrl = "1desiremovies.nexus"
     override var name = "DesireMovies"
     override var lang = "bn"
 

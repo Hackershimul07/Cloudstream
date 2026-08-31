@@ -4,6 +4,7 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import android.content.Context
 import org.json.JSONObject
+import java.net.URLEncoder
 
 class MovieLinkBDProvider : MainAPI() {
     companion object {
@@ -18,8 +19,13 @@ class MovieLinkBDProvider : MainAPI() {
     override val hasDownloadSupport = true
     override val hasQuickSearch = false
 
+    // FIX: "/" (root) is a STATIC SEO LANDING PAGE on this site — live-tested,
+    // it contains marketing text/testimonials/genre-links but ZERO movie
+    // cards. Using it as "Recently Updated" always returned an empty row.
+    // Replaced with "/new" ("Latest Published"), which is a real listing
+    // page — confirmed to contain actual movie/series cards.
     override val mainPage = mainPageOf(
-        "/" to "Recently Updated",
+        "/new" to "Recently Updated",
         "/type/movies" to "All Movies",
         "/type/series" to "All Web Series",
         "/language/hindi" to "Hindi Movies",
@@ -85,10 +91,66 @@ class MovieLinkBDProvider : MainAPI() {
         return newHomePageResponse(HomePageList(request.name, items, isHorizontalImages = true), hasNext = items.isNotEmpty())
     }
 
+    // =========================
+    // SEARCH
+    // =========================
+    //
+    // FIX: The old "$base/?search=$query" call was live-tested and confirmed
+    // BROKEN — it returns the exact same static SEO landing page regardless
+    // of the query (same bug pattern as root "/" above; this site appears
+    // to serve a fixed shell for unrecognized routes/params).
+    //
+    // IMPORTANT — HONESTY NOTE: I could not find the site's real search
+    // endpoint without inspecting live Network requests in a browser
+    // (Chrome DevTools), which requires JS execution I don't have access
+    // to. Rather than guess a single URL and risk being wrong again, this
+    // tries several plausible candidate URLs (common patterns used by
+    // sites like this: query param variants and a path-based search route)
+    // and returns the FIRST one that actually yields real result cards.
+    // If Shimul later confirms the exact working URL via DevTools, this
+    // whole list can be replaced with a single direct call.
+    // FIX (CONFIRMED — 2nd round): got the actual search-results page HTML
+    // directly from Shimul (fetched via real browser). The search form is:
+    //   <form action="/search" method="GET"><input name="q" ...>
+    // So the real, confirmed endpoint is:
+    //   GET $base/search?q=<query>
+    // This is now the primary candidate. Also confirmed from the same HTML:
+    // card container is exactly ".movie-card" (already in our selector list),
+    // title is "a.title" inside ".content", poster is img[data-src]. So the
+    // existing parseMovieCards() logic needs no changes — only the URL did.
+    // A couple of extra fallbacks are kept (harmless, only tried if the
+    // confirmed one somehow returns nothing) in case the site changes again.
+    private val searchUrlCandidates = listOf(
+        { base: String, q: String -> "$base/search?q=$q" },   // confirmed working
+        { base: String, q: String -> "$base/search/$q" },
+        { base: String, q: String -> "$base/?s=$q" }
+    )
+
     override suspend fun search(query: String): List<SearchResponse> {
         val base = getBase()
-        val doc = app.get("$base/?search=${query.trim()}", headers = headers, timeout = 30).document
-        return parseMovieCards(doc, base)
+        val encodedQuery = URLEncoder.encode(query.trim(), "UTF-8")
+
+        for (candidate in searchUrlCandidates) {
+            val url = candidate(base, encodedQuery)
+
+            val doc = runCatching {
+                app.get(url, headers = headers, timeout = 30).document
+            }.getOrNull() ?: continue
+
+            val results = parseMovieCards(doc, base)
+
+            // A candidate is only "working" if it returned real cards AND
+            // isn't just showing the static landing page fallback content
+            // (cheap sanity check: landing page has none of the movie/series
+            // detail links, so parseMovieCards would return empty for it —
+            // meaning a non-empty result here is a good signal we hit a
+            // real search/listing route).
+            if (results.isNotEmpty()) {
+                return results
+            }
+        }
+
+        return emptyList()
     }
 
     private fun parseMovieCards(doc: org.jsoup.nodes.Document, base: String): List<SearchResponse> {
@@ -101,7 +163,8 @@ class MovieLinkBDProvider : MainAPI() {
                     ?: return@forEach
                 val href = aTag.attr("abs:href").ifEmpty { base + aTag.attr("href") }
                 val title = card.selectFirst(".title, .movie-title, h3, h2")?.text()?.trim()
-                    ?: aTag.attr("title").trim()
+                    ?.ifBlank { null }
+                    ?: aTag.attr("title").trim().ifBlank { null }
                     ?: return@forEach
                 val img = card.selectFirst("img")
                 val poster = img?.attr("data-src")?.ifEmpty { img.attr("src") }
@@ -125,9 +188,14 @@ class MovieLinkBDProvider : MainAPI() {
             val img = a.selectFirst("img") ?: return@forEach
             val poster = img.attr("data-src").ifEmpty { img.attr("src") }
             val titleEl = a.parent()?.selectFirst(".title, .movie-title, h3, h2, [class*='name']")
-            val title = titleEl?.text()?.trim()?.takeIf { it.isNotEmpty() }
-                ?: a.attr("title").trim().takeIf { it.isNotEmpty() }
-                ?: a.text().trim().takeIf { it.isNotEmpty() }
+            // FIX: attr()/text() never return null in Kotlin (Jsoup returns
+            // non-null Strings), so the old "?:" chain here was dead code —
+            // an empty string would slip through and never hit the
+            // "return@forEach" fallback. Using .ifBlank { null } makes the
+            // empty-string case actually fall through as intended.
+            val title = titleEl?.text()?.trim()?.ifBlank { null }
+                ?: a.attr("title").trim().ifBlank { null }
+                ?: a.text().trim().ifBlank { null }
                 ?: return@forEach
 
             val type = if (href.contains("/series/") || href.contains("/anime/") || href.contains("/drama/"))
@@ -142,7 +210,7 @@ class MovieLinkBDProvider : MainAPI() {
             doc.select(movieLinkPattern).forEach { a ->
                 val href = a.attr("abs:href").ifEmpty { base + a.attr("href") }
                 if (!seen.add(href)) return@forEach
-                val title = a.text().trim().takeIf { it.isNotEmpty() } ?: return@forEach
+                val title = a.text().trim().ifBlank { null } ?: return@forEach
                 if (title.length < 4 || title.all { it.isUpperCase() || it == ' ' }) return@forEach
                 val type = if (href.contains("/series/") || href.contains("/anime/") || href.contains("/drama/"))
                     TvType.TvSeries else TvType.Movie

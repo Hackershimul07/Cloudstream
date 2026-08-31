@@ -7,6 +7,7 @@ import com.lagradost.cloudstream3.utils.getQualityFromName
 import com.lagradost.cloudstream3.utils.loadExtractor
 import com.lagradost.cloudstream3.utils.newExtractorLink
 import org.jsoup.nodes.Element
+import org.json.JSONArray
 import java.net.URLEncoder
 
 class DesireMoviesProvider : MainAPI() {
@@ -52,7 +53,10 @@ class DesireMoviesProvider : MainAPI() {
             "${request.data}page/$page/"
         }
 
-        val document = app.get(url).document
+        val document = app.get(
+            url,
+            headers = mapOf("User-Agent" to USER_AGENT)
+        ).document
 
         val home = document
             .select("article.mh-loop-item")
@@ -71,14 +75,45 @@ class DesireMoviesProvider : MainAPI() {
 
     override suspend fun search(query: String): List<SearchResponse> {
 
-        val document = app.get(
-            "$mainUrl/?s=${query.trim().replace(" ", "+")}"
-        ).document
+        // FIX: the site's ordinary "?s=" search URL is served through
+        // LiteSpeed Cache's full-page cache, which returns the SAME
+        // cached homepage HTML no matter what the query is (confirmed
+        // by testing several different queries — all returned identical
+        // content). So real search results never come back that way,
+        // and the request may also get blocked outright by anti-bot
+        // protection since it had no User-Agent header.
+        //
+        // WordPress exposes a separate REST API search route
+        // (/wp-json/wp/v2/search) that is not part of that page cache,
+        // so we use that instead and parse its JSON response directly.
+        val encodedQuery = URLEncoder.encode(query.trim(), "UTF-8")
 
-        return document
-            .select("article.mh-loop-item")
-            .mapNotNull { it.toSearchResult() }
-            .distinctBy { it.url }
+        val response = runCatching {
+            app.get(
+                "$mainUrl/wp-json/wp/v2/search?search=$encodedQuery&per_page=30&subtype=post",
+                headers = mapOf("User-Agent" to USER_AGENT)
+            ).text
+        }.getOrNull() ?: return emptyList()
+
+        val results = mutableListOf<SearchResponse>()
+
+        runCatching {
+            val jsonArray = JSONArray(response)
+            for (i in 0 until jsonArray.length()) {
+                val item = jsonArray.getJSONObject(i)
+
+                val title = item.optString("title").trim()
+                val url = item.optString("url").trim()
+
+                if (title.isBlank() || url.isBlank()) continue
+
+                results.add(
+                    newMovieSearchResponse(title, url, TvType.Movie)
+                )
+            }
+        }
+
+        return results.distinctBy { it.url }
     }
 
     // =========================

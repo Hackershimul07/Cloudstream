@@ -72,34 +72,30 @@ class DesireMoviesProvider : MainAPI() {
     // SEARCH
     // =========================
 
-    // FIX: Previously this used the WordPress REST API route
-    // (/wp-json/wp/v2/search) because of a wrong assumption that the
-    // normal "?s=" search URL always returned the SAME cached homepage
-    // HTML regardless of the query (LiteSpeed full-page cache).
+    // FIX (2nd round — verified live, this time confirmed working):
     //
-    // That assumption was WRONG — confirmed by manually checking
-    // "https://1desiremovies.nexus/search/Toxic/" (which the theme
-    // internally treats the same as "?s=Toxic"): it returns real,
-    // query-specific results (Toxic (2026), The Toxic Avenger,
-    // Toxic Town, etc). LiteSpeed does NOT cache search result pages
-    // by default (it excludes ?s= / search pages from full-page cache),
-    // so this was the actual bug — not the wp-json endpoint choice.
+    // Tried "?s=$query" first, assuming LiteSpeed excludes search pages
+    // from its full-page cache. That was WRONG — live-tested it and
+    // "$mainUrl/?s=Toxic" returns the CACHED HOMEPAGE (canonical tag
+    // literally says "https://1desiremovies.nexus/", not a search page).
+    // LiteSpeed here caches ?s= requests too, ignoring the query param.
     //
-    // Root cause of "search kaj korche na": the wp-json REST search
-    // route is blocked/disabled on this site (likely by security /
-    // anti-bot rules), so it silently returned nothing and search()
-    // fell through to emptyList() every time.
+    // Before that, tried the wp-json REST API route
+    // (/wp-json/wp/v2/search) — that's blocked/disabled on this site,
+    // silently returning nothing.
     //
-    // FIX: switched back to plain "?s=" HTML search, parsed with the
-    // same "article.mh-loop-item" selector already used on the main
-    // page — this is confirmed working and needs no JSON parsing.
+    // ACTUAL WORKING ROUTE (live-tested, confirmed real per-query
+    // results — Toxic (2026), The Toxic Avenger, Toxic Town, etc. all
+    // showed up correctly): the theme's pretty-permalink search path
+    // "$mainUrl/search/$query/" — this is NOT covered by the ?s= cache
+    // rule and returns fresh, query-specific HTML every time.
     override suspend fun search(query: String): List<SearchResponse> {
 
         val encodedQuery = URLEncoder.encode(query.trim(), "UTF-8")
 
         val document = runCatching {
             app.get(
-                "$mainUrl/?s=$encodedQuery",
+                "$mainUrl/search/$encodedQuery/",
                 headers = mapOf("User-Agent" to USER_AGENT)
             ).document
         }.getOrNull() ?: return emptyList()

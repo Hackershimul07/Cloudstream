@@ -1,5 +1,5 @@
 // use an integer for version numbers
-version = 6
+version = 26
 
 android {
     buildFeatures {
@@ -35,7 +35,7 @@ cloudstream {
     )
     requiresResources = true
 
-    iconUrl = "https://raw.githubusercontent.com/Hackershimul07/Cloudstream/refs/heads/master/MovieBoxProvider/icon.png"
+    iconUrl = "https://github.com/NivinCNC/CNCVerse-Cloud-Stream-Extension/raw/refs/heads/master/MovieBoxProvider/icon.png"
 
     isCrossPlatform = false
 }
